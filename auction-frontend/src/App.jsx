@@ -20,6 +20,8 @@ import Landing from './pages/Landing'
 import Contact from './pages/Contact'
 import WalletSuccess from './pages/WalletSuccess'
 import WalletCancelPage from './pages/WalletCancelPage'
+import Transactions from './pages/Transaction'
+import Security from './pages/Security'
 
 export default function App() {
   return (
@@ -60,10 +62,17 @@ export default function App() {
             <ProtectedRoute><Profile /></ProtectedRoute>
           } />
 
+          <Route path="/profile/transactions" element={
+            <ProtectedRoute><Transactions /></ProtectedRoute>
+          } />
+          
+          <Route path="/profile/security" element={
+            <ProtectedRoute><Security /></ProtectedRoute>
+          } />
+
           <Route path="/user-dashboard" element={
             <ProtectedRoute><UserDashboard /></ProtectedRoute>
           } />
-          
 
           <Route path="/wallet" element={
             <ProtectedRoute><Wallet /></ProtectedRoute>

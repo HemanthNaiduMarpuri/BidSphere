@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { authAPI } from '../services/api'
 import Navbar from '../components/Navbar'
 import { notify } from '../services/notify'
+import ProfileLayout from '../components/ProfileLayout'
 
 export default function Profile() {
   const { user, refreshUser } = useAuth()
@@ -29,7 +30,9 @@ export default function Profile() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <Navbar />
+      <ProfileLayout>
       <div className="container-md" style={{ padding: '2rem' }}>
+        
         <h1 style={{ fontSize: '28px', marginBottom: '0.5rem' }} className="fade-in">Profile</h1>
         <p style={{ color: 'var(--text2)', marginBottom: '2rem' }} className="fade-in">Manage your account details</p>
 
@@ -76,7 +79,9 @@ export default function Profile() {
             </button>
           </form>
         </div>
+      
       </div>
+    </ProfileLayout>
     </div>
   )
 }

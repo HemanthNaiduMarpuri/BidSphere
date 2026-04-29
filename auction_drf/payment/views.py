@@ -11,6 +11,8 @@ from django.utils import timezone
 from .models import Payment, TopUp
 from auction_item.models import Bid, AuctionRoom
 from users.models import User
+from .serializers import PaymentHistorySerializer, TopupHistorySerializer
+from django.db.models import Q
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -261,3 +263,30 @@ class StripeCancelView(APIView):
         bid.payment_status = Bid.PAYMENT_STATUS.CANCELLED
 
         return Response({'message': 'Payment cancelled'}, status=200)
+    
+class transactionHistoryView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, history_type=None):
+        try:
+            user = request.user
+
+            if history_type == 'topup':
+                topup = TopUp.objects.filter(user=user).order_by('-created_at')
+                serializer = TopupHistorySerializer(topup, many=True)
+                print(serializer.data)
+                return Response({"type": "payment",'data':serializer.data}, status=200)
+            
+            elif history_type == 'payment':
+                if user.is_auctioner:
+                    payments = Payment.objects.filter(Q(user=user) | Q(auction__created_by=user)).select_related('bid', 'auction').order_by('-created_at')
+                else:
+                    payments = Payment.objects.filter(user=user).select_related('bid', 'auction').order_by('-created_at')
+                serializer = PaymentHistorySerializer(payments, many=True)
+                return Response({"type": "payment",'data':serializer.data}, status=200)
+            
+            return Response({'error':'Unable to fetch history'}, status=400)
+            
+        except Exception as e:
+            print(str(e))
+            return Response({'message':str(e)}, status=500)

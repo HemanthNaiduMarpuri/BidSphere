@@ -18,7 +18,6 @@ export default function Contact() {
 
   const loadTickets = async () => {
     try {
-      // const res = await supportAPI.myTickets()
       setTickets(res.data)
     } catch {
       notify.error('Failed to load tickets')

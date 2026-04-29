@@ -38,6 +38,7 @@ export const authAPI = {
   logout: (refresh) => API.post('/users/logout/', { refresh }),
   profile: () => API.get('/users/me/'),
   updateProfile: (data) => API.patch('/users/me/', data),
+  changePassword: (data) => API.post('/users/change-password/', data)
 }
 
 export const auctionAPI = {
@@ -82,7 +83,7 @@ export const bidAPI = {
 export const paymentAPI = {
   topup: (amount) => API.post('/payment/topup/', { amount }),
   settle: (bidId) => API.post(`/payment/pay/${bidId}/`),
-  history: () => API.get('/users/me/payments/'),
+  history: (historyType) => API.get(`/payment/transactions/${historyType}/`),
 }
 
 export default API
