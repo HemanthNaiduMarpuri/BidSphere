@@ -93,7 +93,6 @@ class VerifyOtpView(APIView):
     def post(self, request):
         email = request.data.get('email')
         otp_received = request.data.get('otp')
-        print(otp_received)
         try:
             if otp_received is None:
                 return Response({'message':"No Otp is Received"}, status=401)
@@ -111,8 +110,6 @@ class VerifyOtpView(APIView):
             if otp.attempts >=5:
                 otp.delete()
                 return Response({"error": "Too many attempts"}, status=403)
-            
-            print(otp.verify_otp(otp_received=otp_received))
             
             if not otp.verify_otp(otp_received):
                 otp.attempts += 1

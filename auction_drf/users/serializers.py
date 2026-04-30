@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User
+from .models import User, Otp
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -16,3 +16,8 @@ class UserSerializer(serializers.ModelSerializer):
         if is_auctioner:
             return User.objects.create_auctioner(**validated_data)
         return User.objects.create_user(**validated_data)
+    
+class OtpSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField()
+    

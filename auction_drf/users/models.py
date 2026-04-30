@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import BaseUserManager, PermissionsMixin, AbstractBaseUser
+from django.utils import timezone
+import hashlib
 
 class MyUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -45,3 +47,21 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return f"{self.email}"
     
+
+class Otp(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_otp')
+    otp_hashed = models.CharField(max_length=64)
+    attempts = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_valid(self):
+        return (timezone.now() - self.created_at).total_seconds() < 300
+    
+    def verify_otp(self, otp_received):
+        if otp_received is None:
+            return False
+        hashed = hashlib.sha256(otp_received.encode()).hexdigest()
+        return self.otp_hashed == hashed
+    
+    def  __str__(self):
+        return f"{self.user} -> {self.otp_hashed[:20]}"
