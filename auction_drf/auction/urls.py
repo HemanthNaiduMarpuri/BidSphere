@@ -20,6 +20,7 @@ from auction_item.views import MyTokenObtainPairView, GoogleLogin
 from rest_framework_simplejwt.views import TokenRefreshView
 from django.conf import settings
 from django.conf.urls.static import static
+from users.views import ContactView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -33,7 +34,14 @@ urlpatterns = [
     path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
     path('accounts/', include('allauth.urls')),
 
-    path('api/auth/google/', GoogleLogin.as_view(), name='google_login'),
-]
+    path('api/contact/', ContactView.as_view({'get': 'list', 'post': 'create'})),
+    path('api/contact/<int:pk>/', ContactView.as_view({
+        'get': 'retrieve',
+        'patch': 'partial_update',  
+        'put': 'update',
+        'delete' : 'destroy'
+    })),
+    path('api/contact/<int:pk>/reply/', ContactView.as_view({'post': 'reply'})),
+    ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

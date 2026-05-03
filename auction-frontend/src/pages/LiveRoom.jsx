@@ -459,10 +459,7 @@ export default function LiveRoom() {
   const [showActive, setShowActive] = useState(null)
   const [viewItem, setViewItem] = useState(null)
   const isTopBidder = highestBidder && user?.email === highestBidder
-  console.log(highestBidder)
-  console.log(user?.email)
-  console.log(isTopBidder)
-
+  
   const handleRetract = async () => {
     try {
       await auctionAPI.retractBid(parseInt(id), currentItem.id)

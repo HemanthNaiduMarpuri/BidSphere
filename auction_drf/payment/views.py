@@ -232,8 +232,6 @@ class StripeSuccessView(APIView):
         if payment.payment_status == Payment.PAYMENT_CHOICES.SUCCESS:
             return Response({'message': 'Already processed'}, status=200)
 
-        print("SESSION ID FROM FRONTEND:", session_id)
-        print("TOPUP EXISTS:", Payment.objects.filter(transaction_id=session_id).exists())
         with transaction.atomic():
             payment.payment_status = Payment.PAYMENT_CHOICES.SUCCESS
             payment.paid_at = timezone.now()
@@ -274,7 +272,6 @@ class transactionHistoryView(APIView):
             if history_type == 'topup':
                 topup = TopUp.objects.filter(user=user).order_by('-created_at')
                 serializer = TopupHistorySerializer(topup, many=True)
-                print(serializer.data)
                 return Response({"type": "payment",'data':serializer.data}, status=200)
             
             elif history_type == 'payment':
@@ -288,5 +285,4 @@ class transactionHistoryView(APIView):
             return Response({'error':'Unable to fetch history'}, status=400)
             
         except Exception as e:
-            print(str(e))
             return Response({'message':str(e)}, status=500)

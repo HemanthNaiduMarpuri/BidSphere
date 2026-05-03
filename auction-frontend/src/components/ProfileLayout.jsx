@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom"
+import { useAuth } from "../context/AuthContext"
 export default function ProfileLayout({ children }) {
   const linkStyle = (isActive) => ({
     padding: '10px 14px',
@@ -11,7 +12,8 @@ export default function ProfileLayout({ children }) {
     display: 'block',
     marginBottom: 6
   })
-
+  const {user} = useAuth()
+  
   return (
     <div style={{
       display: 'flex',
@@ -19,7 +21,6 @@ export default function ProfileLayout({ children }) {
       background: 'var(--bg)'
     }}>
 
-      {/* Sidebar */}
       <div style={{
         width: 260,
         padding: '1.5rem 1rem',
@@ -41,9 +42,12 @@ export default function ProfileLayout({ children }) {
         <NavLink to="/profile/security" style={({ isActive }) => linkStyle(isActive)}>
           Security
         </NavLink>
+        {user?.is_superuser &&(
+        <NavLink to="/profile/admin-contact" style={({ isActive }) => linkStyle(isActive)}>
+          Admin Contact
+        </NavLink> )}
       </div>
 
-      {/* Content */}
       <div style={{
         flex: 1,
         padding: '2rem 3rem'

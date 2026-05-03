@@ -86,4 +86,29 @@ export const paymentAPI = {
   history: (historyType) => API.get(`/payment/transactions/${historyType}/`),
 }
 
+export const supportAPI = {
+  getTickets: () => API.get('/contact/'),
+
+  createTicket: (data) =>
+    API.post('/contact/', data, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+
+  updateTicket: (id, data) =>
+    API.patch(`/contact/${id}/`, data, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+
+  replyTicket: (id, data) =>
+    API.post(`/contact/${id}/reply/`, data),
+
+  updateTicket: (id, data) =>
+    API.patch(`/contact/${id}/`, data, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+
+  deleteTicket: (id) =>
+    API.delete(`/contact/${id}/`),
+}
+
 export default API

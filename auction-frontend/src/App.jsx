@@ -22,6 +22,7 @@ import WalletSuccess from './pages/WalletSuccess'
 import WalletCancelPage from './pages/WalletCancelPage'
 import Transactions from './pages/Transaction'
 import Security from './pages/Security'
+import AdminContact from './pages/AdminContact'
 
 export default function App() {
   return (
@@ -48,6 +49,10 @@ export default function App() {
 
           <Route path="/contact" element={
             <ProtectedRoute><Contact /></ProtectedRoute>
+          } />
+
+          <Route path="/profile/admin-contact" element={
+            <ProtectedRoute><AdminContact /></ProtectedRoute>
           } />
 
           <Route path="/auction/:id" element={

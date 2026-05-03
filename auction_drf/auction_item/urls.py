@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 router = DefaultRouter()
 router.register(r'rooms', AuctionRoomView, basename='auction_room')
 
+
 urlpatterns = [
     path('rooms/<int:auction_pk>/items/', AuctionItemView.as_view({
         'get': 'list',

@@ -263,11 +263,8 @@ class AuctionItemView(viewsets.ModelViewSet):
 
             item = get_object_or_404(AuctionItem, pk=auction_item_id)
             auction = get_object_or_404(AuctionRoom, pk=auction_id)
-            print(item)
-            print(auction)
-
+            
             user = request.user
-            print(user)
 
             if auction.created_by == user:
                 return Response({'message':"Auctioneer can't use this feature"}, status=403)
