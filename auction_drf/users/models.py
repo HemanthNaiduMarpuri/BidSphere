@@ -3,6 +3,7 @@ from django.contrib.auth.models import BaseUserManager, PermissionsMixin, Abstra
 from django.utils import timezone
 import hashlib
 from django.contrib.auth.hashers import make_password, check_password
+import uuid6
 
 class MyUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -50,6 +51,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     
 
 class Otp(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_otp')
     otp_hashed = models.CharField(max_length=64)
     attempts = models.IntegerField(default=0)
@@ -74,7 +76,7 @@ class Contact(models.Model):
         SUBMITTED = 'Submitted', 'Submitted'
         RECEIVED = 'Received', 'Received'
         SOLVED = 'Solved', 'Solved'
-        
+    id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contacted_user')
     subject = models.CharField(max_length=255)
     message = models.TextField()

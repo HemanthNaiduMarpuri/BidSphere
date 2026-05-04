@@ -8,7 +8,7 @@ from auction_item.models import AuctionRoom, ChatMessage
 
 class AuctionConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.room_id = self.scope['url_route']['kwargs']['room_id']
+        self.room_id = self.scope['url_route']['kwargs']['room_uuid']
         self.group_name = f'auction_{self.room_id}'
 
         await self.channel_layer.group_add(
@@ -68,7 +68,7 @@ class AuctionConsumer(AsyncWebsocketConsumer):
     async def item_changed(self, event):
         await self.send(text_data=json.dumps({
             'type':'item_changed',
-            'item_id':event['id'],
+            'item_id':str(event['id']),
             'item_name':event['name'],
             'base_price':float(event['base_price']),
             'highest_bid':float(event['highest_bid']) if event.get('highest_bid') is not None else None,
@@ -85,13 +85,13 @@ class AuctionConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type':'item_status',
             'status':event['status'],
-            'item_id':event['item_id']
+            'item_id':str(event['item_id'])
         }))
 
     async def timer_extended(self, event):
         await self.send(text_data=json.dumps({
             'type': 'timer_extended',
-            'item_id': event['item_id'],
+            'item_id': str(event['item_id']),
             'ends_at': event['ends_at'].isoformat() if event.get('ends_at') else None,
         }))
 

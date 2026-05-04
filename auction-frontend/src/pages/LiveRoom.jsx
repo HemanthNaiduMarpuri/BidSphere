@@ -58,6 +58,8 @@ export default function LiveRoom() {
 
   const [cooldown, setCooldown] = useState(null)
 
+  const [remainingExtensions, setRemainingExtensions] = useState(0)
+
   const WS_URL = `ws://localhost:8000/ws/auction/${id}/`
   const socketRef = useRef(null)
 
@@ -322,7 +324,7 @@ export default function LiveRoom() {
     if (!currentItem || !bidAmount) return
     setPlacing(true);
     try {
-      await bidAPI.place({ auction_room: parseInt(id), auction_item: currentItem.id, bid_amount: bidAmount })
+      await bidAPI.place({ auction_room: id, auction_item: currentItem.id, bid_amount: bidAmount })
       notify.bidPlaced()
       setBidAmount('')
     } catch (err) {
@@ -344,27 +346,29 @@ export default function LiveRoom() {
       }
       if (action === 'extendTime') {
         try {
-          setCooldown(true)
+          setCooldown(true);
 
-          res = await auctionAPI.extendTime(id, currentItem.id)
-          const endsAt = res.data.ends_at
-          const remainingExtensions = res.remainingExtensions
+          const res = await auctionAPI.extendTime(id, currentItem.id);
+
+          const endsAt = res.data?.ends_at;
+          const countFromDB = res.data?.remaining_extensions;
+
+          setRemainingExtensions(5 - countFromDB);
 
           if (endsAt) {
-          const seconds = Math.floor(
-            (new Date(endsAt) - new Date()) / 1000
-          )
-          setItemTimeLeft(seconds > 0 ? seconds : 0)
-        }
+            const seconds = Math.floor((new Date(endsAt) - new Date()) / 1000);
+            setItemTimeLeft(seconds > 0 ? seconds : 0);
+          }
 
-          notify.info('Time Extended')
+          notify.info('Time Extended');
+
         } catch (err) {
-          notify.error(err.response?.data?.error || 'Cannot extend')
+          notify.error(err.response?.data?.error || 'Cannot extend');
         } finally {
-          setTimeout(() => setCooldown(false), 2000)
+          setTimeout(() => setCooldown(false), 2000);
         }
-        
       }
+
       if (action === 'next') {
         await auctionAPI.nextItem(id)
         await loadCurrentItem()
@@ -459,7 +463,7 @@ export default function LiveRoom() {
   const [showActive, setShowActive] = useState(null)
   const [viewItem, setViewItem] = useState(null)
   const isTopBidder = highestBidder && user?.email === highestBidder
-  
+
   const handleRetract = async () => {
     try {
       await auctionAPI.retractBid(parseInt(id), currentItem.id)
@@ -974,7 +978,7 @@ export default function LiveRoom() {
                     </form>
                   )}
 
-                 <p style={{ fontSize: 12, color: 'var(--text3)' }}>
+                  <p style={{ fontSize: 12, color: 'var(--text3)' }}>
                     Extensions left: {remainingExtensions}
                   </p>
 
@@ -985,7 +989,7 @@ export default function LiveRoom() {
                     >
                       +5 sec
                     </button>
-                    
+
                   )}
 
                   {isAuctioneer && isLive && (

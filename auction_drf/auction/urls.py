@@ -35,13 +35,13 @@ urlpatterns = [
     path('accounts/', include('allauth.urls')),
 
     path('api/contact/', ContactView.as_view({'get': 'list', 'post': 'create'})),
-    path('api/contact/<int:pk>/', ContactView.as_view({
+    path('api/contact/<uuid:contact_uuid>/', ContactView.as_view({
         'get': 'retrieve',
         'patch': 'partial_update',  
         'put': 'update',
         'delete' : 'destroy'
     })),
-    path('api/contact/<int:pk>/reply/', ContactView.as_view({'post': 'reply'})),
+    path('api/contact/<uuid:contact_uuid>/reply/', ContactView.as_view({'post': 'reply'})),
     ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

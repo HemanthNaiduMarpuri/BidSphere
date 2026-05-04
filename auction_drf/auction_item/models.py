@@ -1,5 +1,5 @@
 from datetime import time, timedelta
-
+import uuid6
 from django.db import models
 from users.models import User
 from django.db import transaction
@@ -12,7 +12,7 @@ class AuctionRoom(models.Model):
         SCHEDULED = 'Scheduled', 'Scheduled'
         LIVE = "Live", 'Live'
         CLOSED = 'Closed', 'Closed'
-
+    id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='auction_rooms') 
     title = models.CharField(max_length=255, blank=False, null=False)
     sector = models.CharField(max_length=255, blank=False, null=False)
@@ -34,7 +34,7 @@ class AuctionItem(models.Model):
         SOLD = 'Sold', 'Sold'
         NOT_SOLD = 'Not Sold', 'Not Sold'
         PASS = 'Pass', 'Pass'
-
+    id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
     auction_room = models.ForeignKey(AuctionRoom, on_delete=models.SET_NULL, null=True, related_name='items')
     name = models.CharField(max_length=255, blank=False)
     description = models.TextField()
@@ -66,7 +66,7 @@ class Bid(models.Model):
         PENDING = 'pending', 'pending'
         PAID = 'paid', 'paid'
         CANCELLED = 'cancelled', 'cancelled'
-
+    id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
     auction_room = models.ForeignKey(AuctionRoom, on_delete=models.SET_NULL, null=True ,related_name='bids')
     auction_item = models.ForeignKey(AuctionItem, on_delete=models.SET_NULL, null=True ,related_name='bids')
     bidder = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='bids')
@@ -83,6 +83,7 @@ class Bid(models.Model):
         return f"{self.bidder} -> {self.bid_amount}"
     
 class ChatMessage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
     auction = models.ForeignKey(AuctionRoom, on_delete=models.CASCADE, related_name='messages')
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.TextField()
@@ -92,6 +93,7 @@ class ChatMessage(models.Model):
         return f"{self.user.first_name} - {self.message[:20]}"
 
 class Wishlist(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
     auction_room = models.ForeignKey(AuctionRoom, on_delete=models.SET_NULL, null=True,related_name='auction_wishlist')
     auction_item = models.ForeignKey(AuctionItem, on_delete=models.SET_NULL, null=True,related_name='item_wishlist')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_wishlist')

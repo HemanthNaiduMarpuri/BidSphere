@@ -152,13 +152,15 @@ class AuctionRoomView(viewsets.ModelViewSet):
 class AuctionItemView(viewsets.ModelViewSet):
     serializer_class = AuctionItemSerializer
     permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'pk'  
+    lookup_url_kwarg = 'item_uuid' 
 
     def get_queryset(self):
-        auction_id = self.kwargs.get('auction_pk')
+        auction_id = self.kwargs.get('room_uuid')
         return AuctionItem.objects.filter(auction_room__id=auction_id)
     
     def perform_create(self, serializer):
-        auction_id = self.kwargs.get('auction_pk')
+        auction_id = self.kwargs.get('room_uuid')
         auction = AuctionRoom.objects.get(id=auction_id)
 
         if auction.created_by != self.request.user:
@@ -167,7 +169,7 @@ class AuctionItemView(viewsets.ModelViewSet):
         serializer.save(auction_room = auction)
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def sold(self, request, auction_pk=None, pk=None):
+    def sold(self, request, room_uuid=None, item_uuid=None):
         try:
             item = self.get_object()
             auction = item.auction_room
@@ -196,7 +198,7 @@ class AuctionItemView(viewsets.ModelViewSet):
             return Response({'message':str(e)}, status=500) 
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def unsold(self, request, auction_pk=None, pk=None):
+    def unsold(self, request, room_uuid=None, item_uuid=None):
         try:
             item = self.get_object()
             auction = item.auction_room
@@ -225,7 +227,7 @@ class AuctionItemView(viewsets.ModelViewSet):
             return Response({'message':str(e)}, status=500) 
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def item_pass(self, request, auction_pk=None, pk=None):
+    def item_pass(self, request, room_uuid=None, item_uuid=None):
         try:
             item = self.get_object()
             auction = item.auction_room
@@ -256,13 +258,13 @@ class AuctionItemView(viewsets.ModelViewSet):
         
 
     @action(detail=True, methods=['post'],  permission_classes=[permissions.IsAuthenticated])
-    def retractBid(self, request, auction_pk=None, item_id=None):
+    def retractBid(self, request, room_uuid=None, item_uuid=None):
         try:
-            auction_item_id = self.kwargs.get('item_id')
-            auction_id = self.kwargs.get('auction_pk')
+            auction_item_id = self.kwargs.get('item_uuid')
+            auction_id = self.kwargs.get('room_uuid')
 
-            item = get_object_or_404(AuctionItem, pk=auction_item_id)
-            auction = get_object_or_404(AuctionRoom, pk=auction_id)
+            item = get_object_or_404(AuctionItem, id=auction_item_id)
+            auction = get_object_or_404(AuctionRoom, id=auction_id)
             
             user = request.user
 
@@ -304,8 +306,8 @@ class AuctionItemView(viewsets.ModelViewSet):
             return Response({'message':str(e)}, status=500)
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
-    def current_item(self, request, auction_pk=None, pk=None):
-        active_item = AuctionItem.objects.filter(auction_room__id=auction_pk, is_sold=AuctionItem.Status.ACTIVE).first()
+    def current_item(self, request, room_uuid=None, item_uuid=None):
+        active_item = AuctionItem.objects.filter(auction_room__id=room_uuid, is_sold=AuctionItem.Status.ACTIVE).first()
         
         if not active_item:
             return Response({"item": None,"highest_bid": None,"ends_at": None}, status=200)
@@ -321,8 +323,8 @@ class AuctionItemView(viewsets.ModelViewSet):
         )
     
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def next_item(self, request, auction_pk=None, pk=None):
-        auction_pk = self.kwargs.get('auction_pk')
+    def next_item(self, request, room_uuid=None, item_uuid=None):
+        auction_pk = self.kwargs.get('room_uuid')
         auction_room = get_object_or_404(AuctionRoom, id=auction_pk)
         
         if auction_room.created_by != request.user:
@@ -366,9 +368,9 @@ class AuctionItemView(viewsets.ModelViewSet):
                 return Response({'message':'No Items Left'}, status=200)
             
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def activate_item(self, request, auction_pk=None, item_id=None):
-        auction_pk = self.kwargs.get('auction_pk')
-        auction_item_id = self.kwargs.get('item_id')
+    def activate_item(self, request, room_uuid=None, item_uuid=None):
+        auction_pk = self.kwargs.get('room_uuid')
+        auction_item_id = self.kwargs.get('item_uuid')
 
         auction_room = get_object_or_404(AuctionRoom, id=auction_pk)
         auction_item = get_object_or_404(AuctionItem, id=auction_item_id)
@@ -408,12 +410,12 @@ class AuctionItemView(viewsets.ModelViewSet):
         return Response({'message':'Item Activated'}, status=200)
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def changeStatus(self, request, auction_pk=None, item_id=None):
-        auction_pk = self.kwargs.get('auction_pk')
-        item_id = self.kwargs.get('item_id')
+    def changeStatus(self, request, room_uuid=None, item_uuid=None):
+        auction_pk = self.kwargs.get('room_uuid')
+        item_id = self.kwargs.get('item_uuid')
 
-        auction = get_object_or_404(AuctionRoom, pk=auction_pk)
-        item = get_object_or_404(AuctionItem, pk=item_id)
+        auction = get_object_or_404(AuctionRoom, id=auction_pk)
+        item = get_object_or_404(AuctionItem, id=item_id)
 
         user = request.user
 
@@ -428,19 +430,21 @@ class AuctionItemView(viewsets.ModelViewSet):
                 item.is_sold = AuctionItem.Status.PENDING
                 item.save()
 
-                return Response({'message':'Item status changed to pendnig'}, status=200)
+                return Response({'message':'Item status changed to pending'}, status=200)
             
         else:
             return Response({'message':'Item is still active'}, status=403)
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def extendTime(self, request, auction_pk=None, item_id=None):
+    def extendTime(self, request, room_uuid=None, item_uuid=None):
 
-        item_id = self.kwargs.get('item_id')
-        auction_id = self.kwargs.get('auction_pk')
+        item_id = self.kwargs.get('item_uuid')
+        auction_id = self.kwargs.get('room_uuid')
 
-        item = get_object_or_404(AuctionItem, pk=item_id)
-        auction = get_object_or_404(AuctionRoom, pk=auction_id)
+        item = get_object_or_404(AuctionItem, id=item_id)
+        auction = get_object_or_404(AuctionRoom, id=auction_id)
+        print(item, auction)
+        
 
         if auction.status != AuctionRoom.Status.LIVE:
             raise PermissionDenied('Auction is not live')
@@ -480,8 +484,8 @@ class AuctionItemView(viewsets.ModelViewSet):
         return Response({'message': 'Timer extended by 5 seconds', 'ends_at': item.ends_at.isoformat(), 'remaining_extensions': MAX_LIMIT - item.extension_count}, status=200)
     
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
-    def bid_history(self, request, auction_pk=None):
-        active_item = AuctionItem.objects.filter(auction_room_id=auction_pk, is_sold=AuctionItem.Status.ACTIVE).first()
+    def bid_history(self, request, room_uuid=None):
+        active_item = AuctionItem.objects.filter(auction_room_id=room_uuid, is_sold=AuctionItem.Status.ACTIVE).first()
         if not active_item:
             return Response([])
         
@@ -504,34 +508,39 @@ class BidView(APIView):
         return Bid.objects.filter(bidder=user)
     
     def post(self, request):
-        serializer = BidSerializer(data = request.data, context={'request': request})
-        
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=400)
-        
-        auction_item = serializer.validated_data['auction_item']
-        
-        if timezone.now() > auction_item.ends_at:
-            return Response({'error': 'Auction ended'}, status=400)
+        try:
+            serializer = BidSerializer(data = request.data, context={'request': request})
+            
+            if not serializer.is_valid():
+                print(serializer.errors)
+                return Response(serializer.errors, status=400)
+            
+            auction_item = serializer.validated_data['auction_item']
+            
+            if timezone.now() > auction_item.ends_at:
+                return Response({'error': 'Auction ended'}, status=400)
 
-        with transaction.atomic():
-            auction_item.bids.filter(is_winning=True).update(is_winning=False, status=Bid.Status.OUTBID)
+            with transaction.atomic():
+                auction_item.bids.filter(is_winning=True).update(is_winning=False, status=Bid.Status.OUTBID)
 
-            bid = serializer.save(bidder=request.user,is_winning=True, status=Bid.Status.ACTIVE)
+                bid = serializer.save(bidder=request.user,is_winning=True, status=Bid.Status.ACTIVE)
 
-            channel_layer = get_channel_layer()
+                channel_layer = get_channel_layer()
 
-            async_to_sync(channel_layer.group_send)(
-                f'auction_{auction_item.auction_room.id}',
-                {
-                    'type':'bid_update',
-                    'bid_amount':str(bid.bid_amount),
-                    'bidder':bid.bidder.email,
-                    'item':bid.auction_item.name
-                }
-            )
+                async_to_sync(channel_layer.group_send)(
+                    f'auction_{auction_item.auction_room.id}',
+                    {
+                        'type':'bid_update',
+                        'bid_amount':str(bid.bid_amount),
+                        'bidder':bid.bidder.email,
+                        'item':bid.auction_item.name
+                    }
+                )
 
-        return Response(BidSerializer(bid).data, status=201)
+            return Response(BidSerializer(bid).data, status=201)
+        except Exception as e:
+            print(e)
+            return Response({'message':str(e)}, status=500)
     
     def get(self, request, status=None, *args, **kwargs):
         status = request.query_params.get('status')
@@ -545,8 +554,8 @@ class BidView(APIView):
 class ChatMessageView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request, auction_id):
-        messages = ChatMessage.objects.filter(auction=auction_id).order_by('-created_at')[:50]
+    def get(self, request, room_uuid):
+        messages = ChatMessage.objects.filter(auction=room_uuid).order_by('-created_at')[:50]
 
         serializer = ChatMessageSerializer(messages, many=True)
         return Response(serializer.data)
@@ -561,12 +570,12 @@ class WishListView(viewsets.ModelViewSet):
         return Wishlist.objects.filter(user=user, is_wishlist=True).select_related('auction_item', 'auction_room')
         
     @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def toggle(self, request, auction_pk=None, item_id=None):
+    def toggle(self, request, room_uuid=None, item_uuid=None):
         try:
             user = request.user
 
-            auction_room = get_object_or_404(AuctionRoom, id=auction_pk)
-            auction_item = get_object_or_404(AuctionItem, id=item_id)
+            auction_room = get_object_or_404(AuctionRoom, id=room_uuid)
+            auction_item = get_object_or_404(AuctionItem, id=item_uuid)
 
             with transaction.atomic():
                 wishlist, created = Wishlist.objects.get_or_create(
