@@ -2,8 +2,8 @@ from datetime import timedelta
 from django.shortcuts import get_object_or_404, render
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import MyTokenObtainPairSerializer
-from .serializers import AuctionRoomCreateSerializer, AuctionRoomDetailSerializer, AuctionItemSerializer, BidSerializer, ChatMessageSerializer, WishListSerializer
-from .models import AuctionRoom, AuctionItem, Bid, ChatMessage, Wishlist
+from .serializers import AuctionRoomCreateSerializer, AuctionRoomDetailSerializer, AuctionItemSerializer, BidSerializer, ChatMessageSerializer, WishListSerializer, RequestPanelSerializer, VoteItemSerializer
+from .models import AuctionRoom, AuctionItem, Bid, ChatMessage, Wishlist, RequestPanel, VoteItem
 from rest_framework import viewsets, permissions
 from rest_framework.response import Response
 from django.db import transaction
@@ -20,6 +20,7 @@ from rest_framework.response import Response
 from users.models import User
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.db.models import F
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
@@ -374,6 +375,7 @@ class AuctionItemView(viewsets.ModelViewSet):
 
         auction_room = get_object_or_404(AuctionRoom, id=auction_pk)
         auction_item = get_object_or_404(AuctionItem, id=auction_item_id)
+        method = request.query_params.get('method')
 
         if auction_room.created_by != request.user:
             raise PermissionDenied('Not your auction')
@@ -384,7 +386,7 @@ class AuctionItemView(viewsets.ModelViewSet):
         if auction_item.is_sold == AuctionItem.Status.ACTIVE:
             return Response({'message':'Item is Active'}, status=200)
         
-        if auction_item.is_sold != AuctionItem.Status.PENDING:
+        if not method == 'request-panel' and auction_item.is_sold != AuctionItem.Status.PENDING:
             return Response({'message': 'Invalid state'}, status=400)
 
         
@@ -498,7 +500,135 @@ class AuctionItemView(viewsets.ModelViewSet):
                 "time": b.placed_at.strftime("%H:%M:%S")
             } for b in bids
         ])
+    
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def requested_items(self, request, room_uuid=None):
+        auction_items = AuctionItem.objects.count()
+        if auction_items <= 0:
+            return Response([])
+        
+        request_items = RequestPanel.objects.filter(auction_room=room_uuid).annotate(score=F('likes') - F('dislikes')).order_by('-score', '-likes')
+        items = RequestPanelSerializer(request_items, many=True)
+        return Response(items.data)
+    
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def request_item(self, request, room_uuid=None, item_uuid=None):
+        try:
+            requester = request.user
+            if not requester.is_authenticated or requester.is_auctioner or requester.is_superuser:
+                return Response({'message':"User not allowed to request item"}, status=400)
             
+            now = timezone.now()
+            
+            auction_room = get_object_or_404(AuctionRoom, id=room_uuid)
+            auction_item = get_object_or_404(AuctionItem, id=item_uuid)
+
+            if auction_room.status == AuctionRoom.Status.CLOSED:
+                return Response({'message':"Can't request item auction is closed"})
+            
+            if now >= auction_room.end_time:
+                return Response({"error": "Auction has already closed."}, status=400)
+            
+            time_remaining = auction_room.end_time - now
+            if time_remaining.total_seconds() < 120:
+                return Response({"error": "Bidding is disabled in the final 2 minutes."}, status=403)
+            
+            if auction_item.is_sold in [AuctionItem.Status.ACTIVE, AuctionItem.Status.SOLD]:
+                return Response({"message": "item may be in active stage or sold out"}, status=400) 
+            
+            with transaction.atomic():
+                panel = RequestPanel.objects.filter(auction_room=auction_room, auction_item=auction_item).first()
+
+                if panel:
+                    return Response({'message': 'Already requested', 'panel_id':panel.id},status=400)
+   
+                new_item = RequestPanel.objects.create(auction_room=auction_room, auction_item=auction_item)
+                new_item.save()
+
+                return Response({'message':'Item Requested and created'}, status=200)
+
+        except Exception as e:
+            return Response({'message':str(e)}, status=500)
+        
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def reject_request_item(self, request, room_uuid=None, item_uuid=None):
+        try:
+            user = request.user
+            auction_room = get_object_or_404(AuctionRoom, id=room_uuid)
+            auction_item = get_object_or_404(AuctionItem, id=item_uuid)
+            
+            if auction_room.created_by != user:
+                return Response({'message':"User can't do this action"}, status=403)
+            
+            with transaction.atomic():
+                item = RequestPanel.objects.get(auction_room=auction_room, auction_item=auction_item)
+                item.is_accepted = RequestPanel.REQUEST_CHOICES.REJECTED
+                item.save()
+
+            return Response({'message':'Item Successfully Rejected'}, status=200)
+        
+        except Exception as e:
+            return Response({'message':str(e)}, status=500)
+    
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def vote_item(self, request, panel_uuid=None):
+        try:
+            user = request.user
+            serializer = VoteItemSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            vote = serializer.validated_data['vote']
+
+            panel = get_object_or_404(RequestPanel, id=panel_uuid)
+
+            existing_vote = VoteItem.objects.filter(user=user, request_panel = panel).first()
+
+            if panel.auction_room.status == AuctionRoom.Status.CLOSED:
+                return Response({'message': 'Auction closed'}, status=400)
+
+            with transaction.atomic():
+                if not existing_vote:
+                    if vote == 'like':
+                        vote_ = VoteItem.objects.create(user=user, request_panel=panel, vote=VoteItem.VOTE.LIKE)
+                        vote_.save()
+                        panel.likes = F('likes') + 1
+                        panel.save()
+                        panel.refresh_from_db()
+
+                    else:
+                        vote_ = VoteItem.objects.create(user=user, request_panel=panel, vote=VoteItem.VOTE.DISLIKE)
+                        vote_.save()
+                        panel.dislikes = F('dislikes') + 1
+                        panel.save()
+                        panel.refresh_from_db()
+
+                    return Response({'message':'Voted Successfully'}, status=200)
+                
+                if (existing_vote == VoteItem.VOTE.LIKE and vote == 'like') or (existing_vote == VoteItem.VOTE.DISLIKE and vote == 'dislike'):
+                    return Response({'message':'Already Voted'}, status=400)
+
+                if (existing_vote == VoteItem.VOTE.LIKE and vote == 'dislike'):
+                    panel.likes = F('likes') - 1
+                    panel.dislikes = F('dislikes') + 1
+
+                    existing_vote.vote = VoteItem.VOTE.DISLIKE
+                    existing_vote.save()
+
+                if (existing_vote == VoteItem.VOTE.DISLIKE and vote == 'like'):
+                    panel.likes = F('dislikes') - 1
+                    panel.dislikes = F('likes') + 1
+
+                    existing_vote.vote = VoteItem.VOTE.LIKE
+                    existing_vote.save()
+                
+                panel.save()
+                panel.refresh_from_db()
+
+            return Response({'message': 'Vote updated', 'likes': panel.likes, 'dislikes': panel.dislikes})
+
+        except Exception as e:
+            return Response({'message':str(e)}, status=500)
+
 class BidView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -515,19 +645,29 @@ class BidView(APIView):
                 print(serializer.errors)
                 return Response(serializer.errors, status=400)
             
-            auction_item = serializer.validated_data['auction_item']
+            item_id = serializer.validated_data['auction_item'].id
             
-            if timezone.now() > auction_item.ends_at:
-                return Response({'error': 'Auction ended'}, status=400)
-
             with transaction.atomic():
+                auction_item = AuctionItem.objects.select_for_update().get(id=item_id)
+                
+                if timezone.now() > auction_item.ends_at:
+                    return Response({'error': 'Auction ended'}, status=400)
+                
+                new_amount = serializer.validated_data['bid_amount']
+
+                if new_amount <= auction_item.base_price:
+                    return Response({'error': 'Bid too low'}, status=400)
+                
                 auction_item.bids.filter(is_winning=True).update(is_winning=False, status=Bid.Status.OUTBID)
 
                 bid = serializer.save(bidder=request.user,is_winning=True, status=Bid.Status.ACTIVE)
 
-                channel_layer = get_channel_layer()
+                auction_item.base_price = new_amount
+                auction_item.save()
 
-                async_to_sync(channel_layer.group_send)(
+            channel_layer = get_channel_layer()
+
+            async_to_sync(channel_layer.group_send)(
                     f'auction_{auction_item.auction_room.id}',
                     {
                         'type':'bid_update',
@@ -535,7 +675,7 @@ class BidView(APIView):
                         'bidder':bid.bidder.email,
                         'item':bid.auction_item.name
                     }
-                )
+            )
 
             return Response(BidSerializer(bid).data, status=201)
         except Exception as e:

@@ -2,7 +2,7 @@ from django.utils import timezone
 from datetime import timedelta
 import datetime
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import AuctionRoom, AuctionItem, Bid, ChatMessage, Wishlist
+from .models import AuctionRoom, AuctionItem, Bid, ChatMessage, Wishlist, RequestPanel
 from rest_framework import serializers
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -80,3 +80,13 @@ class WishListSerializer(serializers.ModelSerializer):
         model = Wishlist
         fields = ['id', 'auction_room', 'auction_item', 'user', 'item_name', 'base_price', 'image' ,'is_wishlist']
         read_only_fields = ['user']
+
+class RequestPanelSerializer(serializers.ModelSerializer):
+    score = serializers.IntegerField(read_only=True)
+    class Meta:
+        model = RequestPanel
+        fields = ['id', 'auction_room', 'auction_item', 'is_accepted', 'likes', 'dislikes', 'score', 'created_at']
+
+class VoteItemSerializer(serializers.Serializer):
+    vote = serializers.ChoiceField(choices=['like', 'dislike'])
+

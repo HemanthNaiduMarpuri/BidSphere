@@ -105,3 +105,40 @@ class Wishlist(models.Model):
     def __str__(self):
         return f"{self.auction_item} -> {self.is_wishlist}"
     
+
+class RequestPanel(models.Model):
+    class REQUEST_CHOICES(models.TextChoices):
+        ACCEPTED = 'Accepted', 'Accepted'
+        PENDING = 'Pending', 'Pending'
+        REJECTED = 'Rejected', 'Rejected'
+
+    id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
+    auction_room = models.ForeignKey(AuctionRoom, on_delete=models.CASCADE, name='request_panel_room')
+    auction_item = models.ForeignKey(AuctionItem, on_delete=models.CASCADE, name='request_item')
+    likes = models.PositiveIntegerField(default=0)
+    dislikes = models.PositiveIntegerField(default=0)
+    is_accepted = models.CharField(max_length=15, choices=REQUEST_CHOICES.choices, default=REQUEST_CHOICES.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['auction_room', 'auction_item']
+
+    def __str__(self):
+        return f"{self.auction_item} -> {self.likes}"
+    
+
+class VoteItem(models.Model):
+    class VOTE(models.TextChoices):
+        LIKE = 'Like', 'Like'
+        DISLIKE = 'DISLIKE', 'DISLIKE'
+
+    id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    request_panel = models.ForeignKey(RequestPanel, on_delete=models.CASCADE, related_name='votes')
+    vote =  models.CharField(max_length=10, choices=VOTE.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'request_panel']
+    
+

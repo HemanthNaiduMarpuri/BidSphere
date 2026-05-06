@@ -43,6 +43,22 @@ urlpatterns = [
         'post': 'activate_item'
     }), name='activate-item'),
 
+    path('request-panel/<uuid:room_uuid>/items/<uuid:item_uuid>/request-item/', AuctionItemView.as_view({
+        'post':'request_item'
+    }), name='request-item'),
+
+    path('request-panel/<uuid:room_uuid>/items/requested-items/', AuctionItemView.as_view({
+        'get':'requested_items'
+    }), name='requested_items'),
+
+    path('request-panel/<uuid:room_uuid>/items/<uuid:item_uuid>/cancel-requested-item/', AuctionItemView.as_view({
+        'post':'reject_request_item'
+    }), name='reject-requested-item'),
+
+    path('request-panel/<uuid:panel_uuid>/items/vote/', AuctionItemView.as_view({
+        'post':'vote_item'
+    }), name='vote_item'),
+
     path('rooms/<uuid:room_uuid>/items/<uuid:item_uuid>/changeStatus/', AuctionItemView.as_view({
         'post': 'changeStatus'
     }), name='changeStatus'),
@@ -59,6 +75,8 @@ urlpatterns = [
         'get': 'bid_history'
     }), name='bid-history'),
 
+    
+
     path('bids/my/', BidView.as_view(), name='my_bids'),
     path('bids/', BidView.as_view(), name='bid'),
     path('rooms/<uuid:room_uuid>/chat/', ChatMessageView.as_view(), name='chat'),
@@ -69,7 +87,8 @@ urlpatterns = [
 
     path('wishlist/<uuid:room_uuid>/items/<uuid:item_uuid>/toggle/', WishListView.as_view({
         'post':'toggle'
-    }))
+    })),
+
 
 ]
 
