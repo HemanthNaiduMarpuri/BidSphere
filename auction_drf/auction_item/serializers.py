@@ -83,9 +83,10 @@ class WishListSerializer(serializers.ModelSerializer):
 
 class RequestPanelSerializer(serializers.ModelSerializer):
     score = serializers.IntegerField(read_only=True)
+    auction_item_name = serializers.CharField(source='auction_item.name', read_only=True)
     class Meta:
         model = RequestPanel
-        fields = ['id', 'auction_room', 'auction_item', 'is_accepted', 'likes', 'dislikes', 'score', 'created_at']
+        fields = ['id', 'auction_room', 'auction_item', 'auction_item_name' , 'is_accepted', 'likes', 'dislikes', 'score', 'created_at']
 
 class VoteItemSerializer(serializers.Serializer):
     vote = serializers.ChoiceField(choices=['like', 'dislike'])

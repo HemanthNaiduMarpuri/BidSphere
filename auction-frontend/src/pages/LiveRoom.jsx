@@ -59,6 +59,8 @@ export default function LiveRoom() {
   const [cooldown, setCooldown] = useState(null)
 
   const [remainingExtensions, setRemainingExtensions] = useState(0)
+  const [activeTab, setActiveTab] = useState('chat')
+  const [requestPanels, setRequestPanels] = useState([])
 
   const WS_URL = `ws://localhost:8000/ws/auction/${id}/`
   const socketRef = useRef(null)
@@ -80,6 +82,15 @@ export default function LiveRoom() {
       const res = await auctionAPI.items(id)
       setUpcomingItems(res.data)
     } catch { }
+  }
+
+  const loadRequestedItems = async () => {
+    try {
+      const res = await auctionAPI.requestedItems(id)
+      setRequestPanels(res.data)
+    } catch {
+      notify.error('Failed to load requests')
+    }
   }
 
   const imgSrc = path => {
@@ -107,7 +118,8 @@ export default function LiveRoom() {
 
   useEffect(() => {
     loadChatHistory(),
-      loadBidHistory()
+      loadBidHistory(),
+      loadRequestedItems()
   }, [])
 
   const parseServerTime = (str) => new Date(str)
@@ -295,6 +307,25 @@ export default function LiveRoom() {
       }
     }
 
+    if (data.type === 'request_vote_update') {
+      setRequestPanels(prev =>
+        prev.map(p =>
+          p.id === data.panel_id
+            ? { ...p, likes: data.likes, dislikes: data.dislikes }
+            : p
+        )
+      )
+    }
+
+    if (data.type === 'item_request_update') {
+      notify.info(`"${data.item_name}" was ${data.action === 'activated' ? 'activated ✅' : 'rejected ❌'}`)
+      loadRequestedItems()
+      if (data.action === 'activated') {
+        loadCurrentItem()
+        loadItems()
+      }
+    }
+
   }, [lastMessage])
 
   const sendMessage = () => {
@@ -308,14 +339,7 @@ export default function LiveRoom() {
       user_id: user?.id
     }
 
-    const request = {
-      type: 'item_request',
-      item: item.name,
-      user: user.email
-    }
-
     socketRef.current.send(JSON.stringify(payload))
-    socketRef.current.send(JSON.stringify(request))
     setChatInput('')
   }
 
@@ -380,17 +404,6 @@ export default function LiveRoom() {
       notify.error('Action failed')
     } finally {
       setActionLoading(null)
-    }
-  }
-
-  const reactivateItem = async item => {
-    try {
-      await auctionAPI.activateItem(id, item.id)
-      notify.info(`${item.name} is now active`)
-      await loadItems()
-      await loadCurrentItem()
-    } catch (err) {
-      notify.error(err.response?.data?.error || 'Cannot reactivate', true)
     }
   }
 
@@ -470,6 +483,16 @@ export default function LiveRoom() {
       notify.warn('Bid retracted')
     } catch (err) {
       notify.error(err.response?.data?.message || 'Failed to retract')
+    }
+  }
+
+  const voteItem = async (panel, vote) => {
+    try {
+      await auctionAPI.voteItem(panel.auction_room, panel.id, vote)
+      notify.success('Vote submitted')
+      loadRequestedItems()
+    } catch (err) {
+      notify.error(err.response?.data?.message || 'Vote failed')
     }
   }
 
@@ -1346,14 +1369,16 @@ export default function LiveRoom() {
                           <button
                             className="btn-outline btn-sm"
                             style={{ width: '100%', marginTop: 8, fontSize: 11 }}
-                            onClick={() => {
-                              socketRef.current.send(JSON.stringify({
-                                type: 'item_request',
-                                item: item.name,
-                                user: user?.email
-                              }))
-
-                              notify.info(`Request sent for "${item.name}"`)
+                            onClick={async () => {
+                              try {
+                                await auctionAPI.requestItem(id, item.id)
+                                notify.info(`Request sent for "${item.name}"`)
+                                loadRequestedItems()
+                                setActiveTab('requests')
+                                setShowChat(true)
+                              } catch (err) {
+                                notify.error(err.response?.data?.message || 'Request failed')
+                              }
                             }}
                           >
                             Request item
@@ -1399,41 +1424,30 @@ export default function LiveRoom() {
         <button
           onClick={() => setShowChat(true)}
           style={{
-            position: 'fixed',
-            bottom: 20,
-            right: 20,
-            width: 52,
-            height: 52,
-            borderRadius: '50%',
-            background: 'var(--gold)',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            boxShadow: '0 6px 20px rgba(0,0,0,0.2)',
-            zIndex: 1000
+            position: 'fixed', bottom: 20, right: 20,
+            width: 52, height: 52, borderRadius: '50%',
+            background: 'var(--gold)', border: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', boxShadow: '0 6px 20px rgba(0,0,0,0.2)', zIndex: 1000
           }}
         >
           <FiMessageCircle size={22} color="#fff" />
         </button>
       )}
+
       {showChat && (
         <div
           onClick={() => setShowChat(false)}
           style={{
-            position: 'fixed',
-            inset: 0,
+            position: 'fixed', inset: 0,
             background: 'rgba(0,0,0,0.2)',
-            zIndex: 998,
-            backdropFilter: 'blur(2px)'
+            zIndex: 998, backdropFilter: 'blur(2px)'
           }}
         />
       )}
 
       <div style={{
-        position: 'fixed',
-        top: 0,
+        position: 'fixed', top: 0,
         right: showChat ? 0 : '-100%',
         width: 'clamp(260px, 32%, 380px)',
         height: '100%',
@@ -1442,89 +1456,254 @@ export default function LiveRoom() {
         boxShadow: '-6px 0 25px rgba(0,0,0,0.4)',
         transition: 'right 0.3s ease',
         zIndex: 999,
-        display: 'flex',
-        flexDirection: 'column'
+        display: 'flex', flexDirection: 'column'
       }}>
+
         <div style={{
-          padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+          padding: '14px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          background: '#1a1a2e'
+          background: '#1a1a2e', flexShrink: 0
         }}>
-          <strong style={{ fontSize: 14, color: '#e2e8f0', fontWeight: 500 }}>Live Chat</strong>
-          <button onClick={() => setShowChat(false)} style={{
-            border: 'none', background: 'none',
-            cursor: 'pointer', color: '#64748b', fontSize: 16
-          }}>✕</button>
-        </div>
-
-        <div style={{
-          flex: 1, overflowY: 'auto', padding: 12, display: 'flex',
-          flexDirection: 'column', gap: 10, background: '#0f0f1a'
-        }}>
-          {chatMessages.map((msg, i) => {
-            const currentUsername = user?.first_name
-            const isMine = msg.username === currentUsername
-            const isAuctioneerMsg = msg.email === auction?.created_by
-
-
-            return (
-              <div key={i} style={{
-                display: 'flex', flexDirection: 'column',
-                alignItems: isMine ? 'flex-end' : 'flex-start'
-              }}>
-                {!isMine && (
-                  <div style={{
-                    fontSize: 10, fontWeight: 600, marginBottom: 3,
-                    color: 'rgba(240,180,41,0.7)', letterSpacing: '0.03em'
-                  }}>
-                    {msg.username} {isAuctioneerMsg ? ' (Auctioneer)' : ''}
-                  </div>
-                )}
-                <div style={{
-                  padding: '8px 12px',
-                  borderRadius: 12,
-                  fontSize: 13,
-                  maxWidth: '80%',
-                  wordBreak: 'break-word',
-                  lineHeight: 1.45,
-                  background: isMine ? 'rgba(240,180,41,0.18)' : 'rgba(255,255,255,0.06)',
-                  border: `1px solid ${isMine ? 'rgba(240,180,41,0.3)' : 'rgba(255,255,255,0.1)'}`,
-                  color: isMine ? '#fde68a' : '#cbd5e1',
-                  borderBottomRightRadius: isMine ? 4 : 12,
-                  borderBottomLeftRadius: isMine ? 12 : 4,
-                }}>
-                  {msg.message}
-                </div>
-                <div style={{ fontSize: 10, color: '#475569', marginTop: 3 }}>{msg.time}</div>
-              </div>
-            )
-          })}
-          <div ref={chatEndRef} />
-        </div>
-
-        <div style={{
-          display: 'flex', gap: 8, padding: '10px 12px',
-          borderTop: '1px solid rgba(255,255,255,0.08)', background: '#1a1a2e', alignItems: 'center'
-        }}>
-          <input
-            value={chatInput}
-            onChange={e => setChatInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && sendMessage()}
-            placeholder="Type a message..."
+          <div style={{ display: 'flex', gap: 6 }}>
+            {['chat', 'requests'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: '5px 14px', borderRadius: 20, fontSize: 12,
+                  fontWeight: 500, cursor: 'pointer', border: 'none',
+                  background: activeTab === tab
+                    ? 'rgba(240,180,41,0.2)'
+                    : 'rgba(255,255,255,0.06)',
+                  color: activeTab === tab ? '#f0b429' : '#64748b',
+                  outline: activeTab === tab ? '1px solid rgba(240,180,41,0.35)' : 'none',
+                  transition: 'all 0.15s'
+                }}
+              >
+                {tab === 'chat' ? `Live Chat${chatMessages.length ? `(${chatMessages.length})`: ''}` : `Requests${requestPanels.length ? ` (${requestPanels.length})` : ''}`}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowChat(false)}
             style={{
-              flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#e2e8f0'
+              border: 'none', background: 'rgba(255,255,255,0.06)',
+              cursor: 'pointer', color: '#64748b', fontSize: 14,
+              width: 28, height: 28, borderRadius: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}
-          />
-          <button onClick={sendMessage} style={{
-            background: 'rgba(240,180,41,0.15)',
-            border: '1px solid rgba(240,180,41,0.35)', color: '#f0b429', borderRadius: 8,
-            padding: '8px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer'
-          }}>
-            Send
-          </button>
+          >✕</button>
         </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: 12, background: '#0f0f1a' }}>
+
+          {activeTab === 'chat' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {chatMessages.length === 0 && (
+                <p style={{ color: '#475569', fontSize: 13, textAlign: 'center', marginTop: 20 }}>
+                  No messages yet. Say hi!
+                </p>
+              )}
+              {chatMessages.map((msg, i) => {
+                const currentUsername = user?.first_name
+                const isMine = msg.username === currentUsername
+                const isAuctioneerMsg = msg.email === auction?.created_by
+                return (
+                  <div key={i} style={{
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: isMine ? 'flex-end' : 'flex-start'
+                  }}>
+                    {!isMine && (
+                      <div style={{
+                        fontSize: 10, fontWeight: 600, marginBottom: 3,
+                        color: isAuctioneerMsg ? '#60a5fa' : 'rgba(240,180,41,0.7)',
+                        letterSpacing: '0.03em'
+                      }}>
+                        {msg.username}{isAuctioneerMsg ? ' · Auctioneer' : ''}
+                      </div>
+                    )}
+                    <div style={{
+                      padding: '8px 12px', borderRadius: 12,
+                      fontSize: 13, maxWidth: '80%',
+                      wordBreak: 'break-word', lineHeight: 1.45,
+                      background: isMine
+                        ? 'rgba(240,180,41,0.18)'
+                        : isAuctioneerMsg
+                          ? 'rgba(96,165,250,0.1)'
+                          : 'rgba(255,255,255,0.06)',
+                      border: `1px solid ${isMine
+                        ? 'rgba(240,180,41,0.3)'
+                        : isAuctioneerMsg
+                          ? 'rgba(96,165,250,0.25)'
+                          : 'rgba(255,255,255,0.1)'}`,
+                      color: isMine ? '#fde68a' : '#cbd5e1',
+                      borderBottomRightRadius: isMine ? 4 : 12,
+                      borderBottomLeftRadius: isMine ? 12 : 4,
+                    }}>
+                      {msg.message}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#475569', marginTop: 3 }}>{msg.time}</div>
+                  </div>
+                )
+              })}
+              <div ref={chatEndRef} />
+            </div>
+          )}
+
+          {activeTab === 'requests' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {requestPanels.length === 0 ? (
+                <div style={{ textAlign: 'center', marginTop: 40 }}>
+                  <p style={{ color: '#475569', fontSize: 13 }}>No item requests yet</p>
+                  <p style={{ color: '#334155', fontSize: 11, marginTop: 4 }}>
+                    Vote on items in the "All items" section below
+                  </p>
+                </div>
+              ) : (
+                requestPanels.map(panel => (
+                  <div key={panel.id} style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 10, padding: 12
+                  }}>
+                    <div style={{
+                      fontWeight: 600, marginBottom: 4,
+                      color: '#e2e8f0', fontSize: 13
+                    }}>
+                      {panel.auction_item_name}
+                    </div>
+                    <div style={{
+                      fontSize: 11, color: '#475569', marginBottom: 10
+                    }}>
+                      {panel.likes + panel.dislikes} votes total
+                    </div>
+
+                    {/* vote bar */}
+                    {(panel.likes + panel.dislikes) > 0 && (
+                      <div style={{
+                        height: 4, borderRadius: 4,
+                        background: 'rgba(255,255,255,0.08)',
+                        marginBottom: 10, overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${Math.round(panel.likes / (panel.likes + panel.dislikes) * 100)}%`,
+                          background: 'var(--gold)', borderRadius: 4,
+                          transition: 'width 0.3s'
+                        }} />
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: 8, marginBottom: isAuctioneer ? 10 : 0 }}>
+                      <button
+                        onClick={() => voteItem(panel, 'like')}
+                        style={{
+                          flex: 1, padding: '6px 0', borderRadius: 8,
+                          fontSize: 12, cursor: 'pointer', fontWeight: 500,
+                          background: 'rgba(34,197,94,0.1)',
+                          border: '1px solid rgba(34,197,94,0.25)',
+                          color: '#4ade80'
+                        }}
+                      >
+                        👍 {panel.likes}
+                      </button>
+                      <button
+                        onClick={() => voteItem(panel, 'dislike')}
+                        style={{
+                          flex: 1, padding: '6px 0', borderRadius: 8,
+                          fontSize: 12, cursor: 'pointer', fontWeight: 500,
+                          background: 'rgba(239,68,68,0.1)',
+                          border: '1px solid rgba(239,68,68,0.25)',
+                          color: '#f87171'
+                        }}
+                      >
+                        👎 {panel.dislikes}
+                      </button>
+                    </div>
+
+                    {isAuctioneer && (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await auctionAPI.activateItem(panel.auction_room, panel.auction_item, 'request-panel')
+                              notify.success('Item activated')
+                              loadRequestedItems()
+                            } catch { notify.error('Activation failed') }
+                          }}
+                          style={{
+                            flex: 1, padding: '6px 0', borderRadius: 8,
+                            fontSize: 12, cursor: 'pointer', fontWeight: 500,
+                            background: 'rgba(240,180,41,0.15)',
+                            border: '1px solid rgba(240,180,41,0.3)',
+                            color: '#f0b429'
+                          }}
+                        >
+                          Activate
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await auctionAPI.rejectRequestedItem(panel.auction_room, panel.auction_item)
+                              notify.success('Request rejected')
+                              loadRequestedItems()
+                            } catch { notify.error('Reject failed') }
+                          }}
+                          style={{
+                            flex: 1, padding: '6px 0', borderRadius: 8,
+                            fontSize: 12, cursor: 'pointer', fontWeight: 500,
+                            background: 'rgba(239,68,68,0.1)',
+                            border: '1px solid rgba(239,68,68,0.25)',
+                            color: '#f87171'
+                          }}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── input bar — only on chat tab ── */}
+        {activeTab === 'chat' && (
+          <div style={{
+            display: 'flex', gap: 8, padding: '10px 12px',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            background: '#1a1a2e', alignItems: 'center', flexShrink: 0
+          }}>
+            <input
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendMessage()}
+              placeholder="Type a message..."
+              style={{
+                flex: 1, background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 8, padding: '8px 12px',
+                fontSize: 13, color: '#e2e8f0', outline: 'none'
+              }}
+            />
+            <button
+              onClick={sendMessage}
+              style={{
+                background: 'rgba(240,180,41,0.15)',
+                border: '1px solid rgba(240,180,41,0.35)',
+                color: '#f0b429', borderRadius: 8,
+                padding: '8px 14px', fontSize: 13,
+                fontWeight: 500, cursor: 'pointer'
+              }}
+            >
+              Send
+            </button>
+          </div>
+        )}
       </div>
+
     </div>
 
   )

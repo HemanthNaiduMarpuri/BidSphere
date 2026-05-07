@@ -69,43 +69,46 @@ class ChangePasswordView(APIView):
 class RequestOtpView(APIView):
     permission_classes = [AllowAny]
     def post(self, request):
-        data = request.data
-        serializer = OtpSerializer(data=data)
-        if serializer.is_valid():
-            email = serializer.validated_data['email']
-            password = serializer.validated_data['password']
+        try:
+            data = request.data
+            serializer = OtpSerializer(data=data)
+            if serializer.is_valid():
+                email = serializer.validated_data['email']
+                password = serializer.validated_data['password']
 
-            user = authenticate(email=email, password=password)
+                user = authenticate(email=email, password=password)
 
-            if user:
-                with transaction.atomic():
-                    last_otp = (
-                        Otp.objects
-                        .select_for_update()  
-                        .filter(user=user)
-                        .order_by('-created_at')
-                        .first()
-                    )
-                    if last_otp and (timezone.now() - last_otp.created_at).seconds < 30:
-                        return Response({"error": "Wait before requesting OTP again"}, status=429)
+                if user:
+                    with transaction.atomic():
+                        last_otp = (
+                            Otp.objects
+                            .select_for_update()  
+                            .filter(user=user)
+                            .order_by('-created_at')
+                            .first()
+                        )
+                        if last_otp and (timezone.now() - last_otp.created_at).seconds < 30:
+                            return Response({"error": "Wait before requesting OTP again"}, status=429)
 
-                    Otp.objects.filter(user=user).delete()
+                        Otp.objects.filter(user=user).delete()
 
-                    otp = f"{random.randint(100000, 999999)}"
+                        otp = f"{random.randint(100000, 999999)}"
+                        
+                        otp_obj = Otp(user=user)
+                        otp_obj.set_otp(otp)
+                        otp_obj.save()
                     
-                    otp_obj = Otp(user=user)
-                    otp_obj.set_otp(otp)
-                    otp_obj.save()
-                
-                send_mail(
-                'Your Login Code',
-                f'Your 2FA code is {otp}',
-                'noreply@myapp.com',
-                [user.email],
-                )
-                return Response({"detail": "OTP sent to your email."}, status=200)
-        return Response({"error": "Invalid credentials"}, status=401)
-    
+                    send_mail(
+                    'Your Login Code',
+                    f'Your 2FA code is {otp}',
+                    'noreply@myapp.com',
+                    [user.email],
+                    )
+                    return Response({"detail": "OTP sent to your email."}, status=200)
+            return Response({"error": "Invalid credentials"}, status=401)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
 class VerifyOtpView(APIView):
     permission_classes = [AllowAny]
     def post(self, request):

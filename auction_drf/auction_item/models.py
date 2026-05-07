@@ -113,8 +113,8 @@ class RequestPanel(models.Model):
         REJECTED = 'Rejected', 'Rejected'
 
     id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
-    auction_room = models.ForeignKey(AuctionRoom, on_delete=models.CASCADE, name='request_panel_room')
-    auction_item = models.ForeignKey(AuctionItem, on_delete=models.CASCADE, name='request_item')
+    auction_room = models.ForeignKey(AuctionRoom, on_delete=models.CASCADE, related_name='request_panel_room')
+    auction_item = models.ForeignKey(AuctionItem, on_delete=models.CASCADE, related_name='request_item')
     likes = models.PositiveIntegerField(default=0)
     dislikes = models.PositiveIntegerField(default=0)
     is_accepted = models.CharField(max_length=15, choices=REQUEST_CHOICES.choices, default=REQUEST_CHOICES.PENDING)
@@ -139,6 +139,6 @@ class VoteItem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ['user', 'request_panel']
+        unique_together = [['user', 'request_panel']]
     
 

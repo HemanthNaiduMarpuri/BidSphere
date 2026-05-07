@@ -95,6 +95,22 @@ class AuctionConsumer(AsyncWebsocketConsumer):
             'ends_at': event['ends_at'].isoformat() if event.get('ends_at') else None,
         }))
 
+    async def request_vote_update(self,event):
+        await self.send(text_data=json.dumps({
+            'type':'request_vote_update',
+            'panel_id':event['panel_id'],
+            'likes':event['likes'],
+            'dislikes':event['dislikes']
+        }))
+
+    async def item_request_update(self, event):
+        await self.send(json.dumps({
+            'type':'item_request_update',
+            'action':event['action'],
+            'item_id':event['item_id'],
+            'item_name':event['item_name']
+        }))
+
     @sync_to_async
     def get_auctioneer_email(self):
         return AuctionRoom.objects.get(id=self.room_id).created_by.email

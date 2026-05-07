@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { notify } from './notify'
 
-const API = axios.create({ baseURL: 'http://localhost:8000/api',  withCredentials: false })
+const API = axios.create({ baseURL: 'http://localhost:8000/api', withCredentials: false })
 
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('access')
@@ -18,7 +18,7 @@ API.interceptors.response.use(
       try {
         const refresh = localStorage.getItem('refresh')
         console.log(refresh)
-        const { data } = await axios.post('http://localhost:8000/api/users/token/refresh/', { refresh }) 
+        const { data } = await axios.post('http://localhost:8000/api/users/token/refresh/', { refresh })
         localStorage.setItem('access', data.access)
         original.headers.Authorization = `Bearer ${data.access}`
         return API(original)
@@ -65,11 +65,15 @@ export const auctionAPI = {
   unsoldItem: (auctionId, itemId) => API.post(`/auctions/rooms/${auctionId}/items/${itemId}/unsold/`),
   passItem: (auctionId, itemId) => API.post(`/auctions/rooms/${auctionId}/items/${itemId}/item_pass/`),
   changeStatus: (auctionId, itemId) => API.post(`/auctions/rooms/${auctionId}/items/${itemId}/changeStatus/`),
-  activateItem: (auctionId, itemId) => API.post(`/auctions/rooms/${auctionId}/items/${itemId}/activate_item/`),
+  activateItem: (auctionId, itemId, method = null) => API.post(`/auctions/rooms/${auctionId}/items/${itemId}/activate_item/${method ? `?method=${method}` : ''}`),
   extendTime: (auctionId, itemId) => API.post(`/auctions/rooms/${auctionId}/items/${itemId}/extendTime/`),
   chatHistory: (auctionId) => API.get(`/auctions/rooms/${auctionId}/chat/`),
   bidHistory: (auctionId) => API.get(`/auctions/rooms/${auctionId}/items/bid_history/`),
   retractBid: (auctionId, itemId) => API.post(`/auctions/rooms/${auctionId}/items/${itemId}/retractBid/`),
+  requestedItems: (roomId) => API.get(`auctions/request-panel/${roomId}/items/requested-items/`),
+  requestItem: (roomId, itemId) => API.post(`auctions/rooms/${roomId}/items/${itemId}/request_item/`),
+  voteItem: (roomId, panelId, vote) => API.post(`auctions/request-panel/${roomId}/items/${panelId}/vote/?vote=${vote}`),
+  rejectRequestedItem: (roomId, itemId) => API.post(`auctions/request-panel/${roomId}/items/${itemId}/cancel-requested-item/`),
   toggle: (auctionId, itemId) => API.post(`auctions/wishlist/${auctionId}/items/${itemId}/toggle/`),
   wishlistList: () => API.get('auctions/wishlist/')
 }

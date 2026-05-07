@@ -309,7 +309,7 @@ class AuctionItemView(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def current_item(self, request, room_uuid=None, item_uuid=None):
         active_item = AuctionItem.objects.filter(auction_room__id=room_uuid, is_sold=AuctionItem.Status.ACTIVE).first()
-        
+
         if not active_item:
             return Response({"item": None,"highest_bid": None,"ends_at": None}, status=200)
         
@@ -397,17 +397,13 @@ class AuctionItemView(viewsets.ModelViewSet):
         
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(
-            f'auction_{auction_pk}',
-            {
-                'type': 'item_changed',
-                'id': auction_item.id,
-                'name': auction_item.name,
-                'base_price': str(auction_item.base_price),
-                'highest_bid': None,
-                'ends_at': auction_item.ends_at,
+            f'auction_{auction_room.id}', {
+                'type': 'item_request_update',
+                'action': 'accepted',
+                'item_id': str(auction_item.id),
+                'item_name': auction_item.name,
             }
         )
-
 
         return Response({'message':'Item Activated'}, status=200)
 
@@ -445,9 +441,7 @@ class AuctionItemView(viewsets.ModelViewSet):
 
         item = get_object_or_404(AuctionItem, id=item_id)
         auction = get_object_or_404(AuctionRoom, id=auction_id)
-        print(item, auction)
         
-
         if auction.status != AuctionRoom.Status.LIVE:
             raise PermissionDenied('Auction is not live')
         
@@ -565,19 +559,25 @@ class AuctionItemView(viewsets.ModelViewSet):
                 item.is_accepted = RequestPanel.REQUEST_CHOICES.REJECTED
                 item.save()
 
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'auction_{auction_room.id}', {
+                    'type': 'item_request_update',
+                    'action': 'rejected',
+                    'item_id': str(auction_item.id),
+                    'item_name': auction_item.name,
+                }
+            )
             return Response({'message':'Item Successfully Rejected'}, status=200)
         
         except Exception as e:
             return Response({'message':str(e)}, status=500)
     
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def vote_item(self, request, panel_uuid=None):
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def vote_item(self, request, room_uuid=None, panel_uuid=None):
         try:
             user = request.user
-            serializer = VoteItemSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-
-            vote = serializer.validated_data['vote']
+            vote =  request.query_params.get('vote')
 
             panel = get_object_or_404(RequestPanel, id=panel_uuid)
 
@@ -604,25 +604,36 @@ class AuctionItemView(viewsets.ModelViewSet):
 
                     return Response({'message':'Voted Successfully'}, status=200)
                 
-                if (existing_vote == VoteItem.VOTE.LIKE and vote == 'like') or (existing_vote == VoteItem.VOTE.DISLIKE and vote == 'dislike'):
+                if (existing_vote.vote == VoteItem.VOTE.LIKE and vote == 'like') or (existing_vote == VoteItem.VOTE.DISLIKE and vote == 'dislike'):
                     return Response({'message':'Already Voted'}, status=400)
 
-                if (existing_vote == VoteItem.VOTE.LIKE and vote == 'dislike'):
-                    panel.likes = F('likes') - 1
+                if (existing_vote.vote == VoteItem.VOTE.LIKE and vote == 'dislike'):
+                    panel.likes = F('likes') - 1   
                     panel.dislikes = F('dislikes') + 1
 
                     existing_vote.vote = VoteItem.VOTE.DISLIKE
                     existing_vote.save()
 
-                if (existing_vote == VoteItem.VOTE.DISLIKE and vote == 'like'):
-                    panel.likes = F('dislikes') - 1
-                    panel.dislikes = F('likes') + 1
+                if (existing_vote.vote == VoteItem.VOTE.DISLIKE and vote == 'like'):
+                    panel.dislikes = F('dislikes') - 1
+                    panel.likes = F('likes') + 1
 
                     existing_vote.vote = VoteItem.VOTE.LIKE
                     existing_vote.save()
                 
                 panel.save()
                 panel.refresh_from_db()
+
+                channel_layer = get_channel_layer()
+
+                async_to_sync(channel_layer.group_send)(
+                    f'auction_{panel.auction_room.id}',{
+                        'type':'request_vote_update',
+                        'panel_id':str(panel.id),
+                        'likes':panel.likes,
+                        'dislikes':panel.dislikes
+                    }
+                )
 
             return Response({'message': 'Vote updated', 'likes': panel.likes, 'dislikes': panel.dislikes})
 
@@ -642,7 +653,6 @@ class BidView(APIView):
             serializer = BidSerializer(data = request.data, context={'request': request})
             
             if not serializer.is_valid():
-                print(serializer.errors)
                 return Response(serializer.errors, status=400)
             
             item_id = serializer.validated_data['auction_item'].id
@@ -679,7 +689,6 @@ class BidView(APIView):
 
             return Response(BidSerializer(bid).data, status=201)
         except Exception as e:
-            print(e)
             return Response({'message':str(e)}, status=500)
     
     def get(self, request, status=None, *args, **kwargs):

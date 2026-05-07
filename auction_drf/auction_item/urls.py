@@ -54,9 +54,9 @@ urlpatterns = [
     path('request-panel/<uuid:room_uuid>/items/<uuid:item_uuid>/cancel-requested-item/', AuctionItemView.as_view({
         'post':'reject_request_item'
     }), name='reject-requested-item'),
-
-    path('request-panel/<uuid:panel_uuid>/items/vote/', AuctionItemView.as_view({
-        'post':'vote_item'
+    
+    path('request-panel/<uuid:room_uuid>/items/<uuid:panel_uuid>/vote/', AuctionItemView.as_view({
+        'post': 'vote_item'
     }), name='vote_item'),
 
     path('rooms/<uuid:room_uuid>/items/<uuid:item_uuid>/changeStatus/', AuctionItemView.as_view({
