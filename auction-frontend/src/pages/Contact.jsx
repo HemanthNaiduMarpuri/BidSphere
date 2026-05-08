@@ -3,6 +3,7 @@ import { supportAPI } from '../services/api'
 import { notify } from '../services/notify'
 import Navbar from '../components/Navbar'
 import ConfirmModal from '../components/ConfirmModal'
+import { useNavigate } from "react-router-dom"
 
 export default function Contact() {
   const [form, setForm] = useState({
@@ -21,6 +22,7 @@ export default function Contact() {
   })
   const [deleteId, setDeleteId] = useState(null)
   const [showConfirm, setShowConfirm] = useState(false)
+  const navigate = useNavigate()
 
   const loadTickets = async () => {
     try {
@@ -130,7 +132,33 @@ export default function Contact() {
     }}>
       <Navbar />
 
+
       <div style={{ maxWidth: 800, margin: '0 auto', padding: "40px" }}>
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            marginBottom: '1.2rem',
+            padding: '10px 14px',
+            borderRadius: '10px',
+            border: '1px solid rgba(255,255,255,0.06)',
+            background: 'rgba(255,255,255,0.03)',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: '0.2s'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(240,180,41,0.12)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
+          }}
+        >
+          ← Back
+        </button>
 
         <div style={{
           background: '#12121f',

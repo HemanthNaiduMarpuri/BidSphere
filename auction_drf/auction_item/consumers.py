@@ -111,6 +111,14 @@ class AuctionConsumer(AsyncWebsocketConsumer):
             'item_name':event['item_name']
         }))
 
+    async def item_completed(self, event):
+        await self.send(json.dumps({
+            'type':'item_completed',
+            'item_id':event['item_id'],
+            'status':event['status'],
+            'message':event['message']
+        }))
+
     @sync_to_async
     def get_auctioneer_email(self):
         return AuctionRoom.objects.get(id=self.room_id).created_by.email

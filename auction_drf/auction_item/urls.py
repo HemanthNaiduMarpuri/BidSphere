@@ -62,6 +62,10 @@ urlpatterns = [
     path('rooms/<uuid:room_uuid>/items/<uuid:item_uuid>/changeStatus/', AuctionItemView.as_view({
         'post': 'changeStatus'
     }), name='changeStatus'),
+
+    path('rooms/<uuid:room_uuid>/items/<uuid:item_uuid>/complete/', AuctionItemView.as_view({
+        'post': 'completed_item'
+    }), name='completed_item'),
     
     path('rooms/<uuid:room_uuid>/items/<uuid:item_uuid>/extendTime/', AuctionItemView.as_view({
         'post': 'extendTime'

@@ -13,6 +13,7 @@ from auction_item.models import Bid, AuctionRoom
 from users.models import User
 from .serializers import PaymentHistorySerializer, TopupHistorySerializer
 from django.db.models import Q
+from django.core.mail import send_mail
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -74,7 +75,7 @@ class TopUpSuccessView(APIView):
     def get(self, request):
         try:
             session_id = request.GET.get('session_id')
-
+            
             topup = get_object_or_404(TopUp, transaction_id=session_id)
 
             if topup.payment_status == TopUp.PAYMENT_CHOICES.SUCCESS:
@@ -88,7 +89,23 @@ class TopUpSuccessView(APIView):
                 user = topup.user
                 user.wallet_balance += topup.amount
                 user.save()
+                
+            send_mail(
+                'Top Up Successful',
+                f'''
+            Hi {topup.user.first_name},
 
+            Your wallet top up was successful.
+
+            Transaction ID: {session_id}
+            Amount Added: {topup.amount}
+
+            The amount has been added to your wallet successfully.
+            ''',
+                'noreply@myapp.com',
+                [topup.user.email],
+            )
+            
             return Response({'message': 'TopUp successful'}, status=200)
         except Exception as e:
             return Response({'message':str(e)}, status=500)
@@ -104,16 +121,31 @@ class TopUpCancelView(APIView):
         topup.payment_status = TopUp.PAYMENT_CHOICES.CANCELLED
         topup.save()
 
+        send_mail(
+            'Top Up UnSuccessful',
+            f'''
+        Hi {topup.user.first_name},
+
+        Your wallet top up was Unsuccessful.
+
+        Transaction ID: {session_id}
+
+        The amount has not been added to your wallet and amount is credited from your bank account.
+        ''',
+            'noreply@myapp.com',
+            [topup.user.email],
+        )
+
         return Response({'message': 'TopUp cancelled'}, status=200)
 
 class PaymentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request, bid_id):
+    def post(self, request, bid_uuid):
         try:
             bid = Bid.objects.select_related(
                 'bidder', 'auction_room'
-            ).get(id=bid_id)
+            ).get(id=bid_uuid)
         except Bid.DoesNotExist:
             return Response({'error': 'Bid not found'}, status=404)
 
@@ -169,7 +201,7 @@ class PaymentView(APIView):
                         'auction':auction,
                         'user':bidder,
                         'payment_status':Payment.PAYMENT_CHOICES.SUCCESS,
-                        'transaction_id':f'wallet_{bid_id}'
+                        'transaction_id':f'wallet_{bid_uuid}'
                     }
                 )
                 
@@ -244,6 +276,22 @@ class StripeSuccessView(APIView):
             auctioneer.wallet_balance += payment.bid.bid_amount
             auctioneer.save()
 
+        send_mail(
+            'Payment Successful',
+            f'''
+        Hi {payment.user.first_name},
+
+        Your Payment for item {payment.bid.auction_item.name} was successful.
+
+        Transaction ID: {session_id}
+        Amount : {payment.amount}
+
+        The amount has been received and your item is added to your Won List.
+        ''',
+            'noreply@myapp.com',
+            [payment.user.email],
+        )
+
         return Response({'message': 'Payment successful'}, status=200)
 
 
@@ -259,6 +307,22 @@ class StripeCancelView(APIView):
         payment.save()
 
         bid.payment_status = Bid.PAYMENT_STATUS.CANCELLED
+
+        send_mail(
+            'Payment UnSuccessful',
+            f'''
+        Hi {payment.user.first_name},
+
+        Your wallet top up was successful.
+
+        Transaction ID: {session_id}
+        Amount : {payment.amount}
+
+        The Transaction is failed you can pay again later.
+        ''',
+            'noreply@myapp.com',
+            [payment.user.email],
+        )
 
         return Response({'message': 'Payment cancelled'}, status=200)
     

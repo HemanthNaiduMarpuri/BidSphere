@@ -71,9 +71,10 @@ export const auctionAPI = {
   bidHistory: (auctionId) => API.get(`/auctions/rooms/${auctionId}/items/bid_history/`),
   retractBid: (auctionId, itemId) => API.post(`/auctions/rooms/${auctionId}/items/${itemId}/retractBid/`),
   requestedItems: (roomId) => API.get(`auctions/request-panel/${roomId}/items/requested-items/`),
-  requestItem: (roomId, itemId) => API.post(`auctions/rooms/${roomId}/items/${itemId}/request_item/`),
+  requestItem: (roomId, itemId) => API.post(`auctions/request-panel/${roomId}/items/${itemId}/request-item/`),
   voteItem: (roomId, panelId, vote) => API.post(`auctions/request-panel/${roomId}/items/${panelId}/vote/?vote=${vote}`),
   rejectRequestedItem: (roomId, itemId) => API.post(`auctions/request-panel/${roomId}/items/${itemId}/cancel-requested-item/`),
+  completeItem: (roomId, itemId) => API.post(`/auctions/rooms/${roomId}/items/${itemId}/complete/`),
   toggle: (auctionId, itemId) => API.post(`auctions/wishlist/${auctionId}/items/${itemId}/toggle/`),
   wishlistList: () => API.get('auctions/wishlist/')
 }

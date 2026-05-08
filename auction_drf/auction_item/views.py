@@ -21,6 +21,7 @@ from users.models import User
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import F
+from django.core.mail import send_mail
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
@@ -192,6 +193,11 @@ class AuctionItemView(viewsets.ModelViewSet):
                     item.is_sold = AuctionItem.Status.SOLD
                     item.save()
                 broadcast(auction.id, {'type': 'item_status', 'status': 'Sold', 'item_id':item.id})
+                send_mail("You Won a Bid in BidSphere", 
+                        f'{winning_bid.bidder.first_name}, You won bid for {winning_bid.auction_item.name} in BidSphere auction {auction.title}',
+                        'noreply@myapp.com',
+                        [winning_bid.bidder.email],)
+
 
                 return Response({'message': f'{item.name} marked as sold'} ,status=200)
             
@@ -393,6 +399,11 @@ class AuctionItemView(viewsets.ModelViewSet):
         with transaction.atomic():
             auction_item.is_sold = AuctionItem.Status.ACTIVE
             auction_item.ends_at = timezone.now() + timedelta(seconds=auction_item.duration)
+            if method == 'request-panel':
+                panel = RequestPanel.objects.filter(auction_room=auction_pk, auction_item=auction_item_id).first()
+                if panel:
+                    panel.is_accepted = RequestPanel.REQUEST_CHOICES.ACCEPTED
+                    panel.save()
             auction_item.save()
         
         channel_layer = get_channel_layer()
@@ -501,7 +512,7 @@ class AuctionItemView(viewsets.ModelViewSet):
         if auction_items <= 0:
             return Response([])
         
-        request_items = RequestPanel.objects.filter(auction_room=room_uuid).annotate(score=F('likes') - F('dislikes')).order_by('-score', '-likes')
+        request_items = RequestPanel.objects.filter(auction_room=room_uuid, is_accepted=RequestPanel.REQUEST_CHOICES.PENDING).annotate(score=F('likes') - F('dislikes')).order_by('-score', '-likes')
         items = RequestPanelSerializer(request_items, many=True)
         return Response(items.data)
     
@@ -639,6 +650,49 @@ class AuctionItemView(viewsets.ModelViewSet):
 
         except Exception as e:
             return Response({'message':str(e)}, status=500)
+        
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def completed_item(self, request, room_uuid=None, item_uuid=None):
+        try:
+            auction_room = get_object_or_404(AuctionRoom, id=room_uuid)
+            auction_item = get_object_or_404(AuctionItem, id=item_uuid)
+
+            if auction_item.is_sold != AuctionItem.Status.ACTIVE:
+                return Response({'message': 'Item already completed'}, status=400)
+            
+            highest_bid = Bid.objects.filter(auction_room=auction_room, auction_item=auction_item).order_by('-bid_amount').first()
+            with transaction.atomic():
+                if highest_bid:
+                    highest_bid.status = Bid.Status.WON
+                    highest_bid.save()
+
+                    auction_item.is_sold = AuctionItem.Status.SOLD
+                    auction_item.save()
+
+                    message = (f'{auction_item.name} sold 'f'to {highest_bid.user.email}')
+
+                else:
+                    auction_item.is_sold = AuctionItem.Status.NOT_SOLD
+                    auction_item.save()
+
+                    message = (f'{auction_item.name} unsold')
+
+            channel_layer = get_channel_layer()
+
+            async_to_sync(channel_layer.group_send)(
+                f'auction_{room_uuid}',
+                {
+                    'type': 'item_completed',
+                    'item_id': str(auction_item.id),
+                    'status': auction_item.is_sold,
+                    'message': message
+                }
+            )
+
+            return Response({'message': message}, status=200)
+
+        except Exception as e:
+            return Response({'message': str(e)}, status=500)
 
 class BidView(APIView):
     permission_classes = [permissions.IsAuthenticated]

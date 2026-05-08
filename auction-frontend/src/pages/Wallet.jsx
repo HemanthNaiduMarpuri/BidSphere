@@ -35,6 +35,7 @@ export default function Wallet() {
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <Navbar />
       <div className="container-sm" style={{ padding: '2rem' }}>
+        
         <h1 style={{ fontSize: '28px', marginBottom: '0.5rem' }} className="fade-in">Wallet</h1>
         <p style={{ color: 'var(--text2)', marginBottom: '2rem' }} className="fade-in">Manage your bidding balance</p>
 

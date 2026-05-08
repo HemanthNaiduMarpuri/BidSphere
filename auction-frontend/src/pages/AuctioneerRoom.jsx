@@ -88,10 +88,31 @@ export default function AuctioneerRoom() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }} className="fade-in">
           <div>
-            <button onClick={() => navigate('/dashboard')} style={{
-              background: 'none', border: 'none', color: 'var(--text2)',
-              fontSize: '13px', cursor: 'pointer', padding: 0, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px'
-            }}>← Back to dashboard</button>
+            <button
+  onClick={() => navigate(-1)}
+  style={{
+    marginBottom: '1.2rem',
+    padding: '10px 14px',
+    borderRadius: '10px',
+    border: '1px solid rgba(255,255,255,0.06)',
+    background: 'rgba(255,255,255,0.03)',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: '13px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: '0.2s'
+  }}
+  onMouseEnter={(e) => {
+    e.currentTarget.style.background = 'rgba(240,180,41,0.12)'
+  }}
+  onMouseLeave={(e) => {
+    e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
+  }}
+>
+  ← Back
+</button>
             <h1 style={{ fontSize: '24px', marginBottom: '4px' }}>{auction?.auction_title}</h1>
             <p style={{ color: 'var(--text2)', fontSize: '13px' }}>{auction?.sector}</p>
           </div>

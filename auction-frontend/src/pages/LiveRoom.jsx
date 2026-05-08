@@ -141,7 +141,7 @@ export default function LiveRoom() {
       )
       if (endsAt) {
         const seconds = Math.floor((parseServerTime(endsAt) - Date.now()) / 1000)
-        startTimer(seconds > 0 ? seconds : 0)
+        startTimer(seconds > 0 ? seconds : 0, item.id)
       }
     } catch {
       setCurrentItem(null)
@@ -235,7 +235,7 @@ export default function LiveRoom() {
             const seconds = Math.floor(
               (new Date(res.data.ends_at) - new Date()) / 1000
             )
-            startTimer(seconds > 0 ? seconds : 0)
+            startTimer(seconds > 0 ? seconds : 0, res.data.item.id)
           }
         })
     }
@@ -248,11 +248,11 @@ export default function LiveRoom() {
       setBidAmount('')
       notify.info('Item Changed')
       loadItems()
-
+      loadCurrentItem()
 
       if (data.ends_at) {
         const seconds = Math.floor((parseServerTime(data.ends_at) - Date.now()) / 1000)
-        startTimer(seconds > 0 ? seconds : 0)
+        startTimer(seconds > 0 ? seconds : 0, data.item_id)
       }
       if (wishlistIds.includes(data.item_id)) {
         notify.success(`Your wishlisted item "${data.item_name}" is LIVE!`)
@@ -276,7 +276,7 @@ export default function LiveRoom() {
         const seconds = Math.floor(
           (new Date(data.ends_at) - new Date()) / 1000
         )
-        startTimer(seconds > 0 ? seconds : 0)
+        startTimer(seconds > 0 ? seconds : 0, data.item_id)
       }
     }
 
@@ -318,12 +318,28 @@ export default function LiveRoom() {
     }
 
     if (data.type === 'item_request_update') {
-      notify.info(`"${data.item_name}" was ${data.action === 'activated' ? 'activated ✅' : 'rejected ❌'}`)
+      notify.info(`"${data.item_name}" was ${data.action === 'accepted' ? 'activated' : 'rejected'}`)
       loadRequestedItems()
       if (data.action === 'activated') {
         loadCurrentItem()
         loadItems()
       }
+    }
+
+    if (data.type === 'item_completed') {
+
+      notify.info(data.message)
+
+      setUpcomingItems(prev =>
+        prev.map(item =>
+          item.id === data.item_id
+            ? {
+              ...item,
+              is_sold: data.status
+            }
+            : item
+        )
+      )
     }
 
   }, [lastMessage])
@@ -498,7 +514,7 @@ export default function LiveRoom() {
 
   const timerRef = useRef(null)
 
-  const startTimer = (seconds) => {
+  const startTimer = (seconds, itemId) => {
     if (timerRef.current) clearInterval(timerRef.current)
     setItemTimeLeft(seconds)
 
@@ -506,12 +522,27 @@ export default function LiveRoom() {
       setItemTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(timerRef.current)
-          notify.info('Item time ended')
+          handleItemEnd(itemId)
           return 0
         }
         return prev - 1
       })
     }, 1000)
+  }
+
+  const handleItemEnd = async (itemId) => {
+    try {
+
+      const res = await auctionAPI.completeItem(id, itemId)
+
+      notify.success(res.data.message)
+
+    } catch (err) {
+      notify.error(
+        err.response?.data?.message ||
+        'Failed to complete item'
+      )
+    }
   }
 
   useEffect(() => () => clearInterval(timerRef.current), [])
@@ -753,7 +784,33 @@ export default function LiveRoom() {
       <div className="container" style={{ padding: '1.5rem' }}>
         <div className="fade-in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <div>
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                marginBottom: '1.2rem',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                border: '1px solid rgba(255,255,255,0.06)',
+                background: 'rgba(255,255,255,0.03)',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: '13px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: '0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(240,180,41,0.12)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
+              }}
+            >
+              ← Back
+            </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+
               <h1 style={{ fontSize: 24 }}>{auction?.title}</h1>
               <span className="badge badge-live"><span className="dot-live" /> Live</span>
             </div>
@@ -1481,7 +1538,7 @@ export default function LiveRoom() {
                   transition: 'all 0.15s'
                 }}
               >
-                {tab === 'chat' ? `Live Chat${chatMessages.length ? `(${chatMessages.length})`: ''}` : `Requests${requestPanels.length ? ` (${requestPanels.length})` : ''}`}
+                {tab === 'chat' ? `Live Chat${chatMessages.length ? `(${chatMessages.length})` : ''}` : `Requests${requestPanels.length ? ` (${requestPanels.length})` : ''}`}
               </button>
             ))}
           </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { auctionAPI } from '../services/api'
 import Navbar from '../components/Navbar'
 import { notify } from '../services/notify'
@@ -8,6 +8,7 @@ export default function Dashboard() {
   const [auctions, setAuctions] = useState([])
   const [loading, setLoading] = useState(true)
   const [timeLeftMap, setTimeLeftMap] = useState({})
+  const navigate = useNavigate()
 
   const canStartAuction = (startTime) => {
     if (!startTime) return false
@@ -65,6 +66,31 @@ export default function Dashboard() {
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <Navbar />
       <div className="container" style={{ padding: '2rem' }}>
+        <button
+  onClick={() => navigate(-1)}
+  style={{
+    marginBottom: '1.2rem',
+    padding: '10px 14px',
+    borderRadius: '10px',
+    border: '1px solid rgba(255,255,255,0.06)',
+    background: 'rgba(255,255,255,0.03)',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: '13px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: '0.2s'
+  }}
+  onMouseEnter={(e) => {
+    e.currentTarget.style.background = 'rgba(20, 114, 237, 0.12)'
+  }}
+  onMouseLeave={(e) => {
+    e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
+  }}
+>
+  ← Back
+</button>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }} className="fade-in">
           <div>
