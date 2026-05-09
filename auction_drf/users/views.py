@@ -16,6 +16,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from datetime import timedelta
 from django.conf import settings
+from .permissions import IsOwnerOrReadOnly, IsSuperUser
 
 class RegisterView(generics.CreateAPIView):
     query_set = User.objects.all()
@@ -157,13 +158,25 @@ class VerifyOtpView(APIView):
 
 class ContactView(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
+
+        elif self.action == 'reply':
+            permission_classes = [permissions.IsAuthenticated, IsSuperUser]
+
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+
+        return [permission() for permission in permission_classes]
     
     def get_serializer_class(self):
         user = self.request.user
-        if self.action in ['create', 'update', 'partial_update']:
-            return ContactPostSerializer
-        if user.is_superuser and self.action in ['create', 'update']:
+        if user.is_superuser and self.action in ['update', 'partial_update']:
             return ContactSuperSerializer
+        if self.action  in ['create']:
+            return ContactPostSerializer
         return ContactSerializer
     
     def get_queryset(self):
@@ -174,9 +187,6 @@ class ContactView(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         user = self.request.user
-
-        if not user or user.is_anonymous:
-            raise ValidationError("Authentication required")
 
         subject = serializer.validated_data.get('subject')
         message = serializer.validated_data.get('message')
@@ -237,7 +247,7 @@ class ContactView(viewsets.ModelViewSet):
 
         serializer.save(status=Contact.STATUS_CHOICES.SUBMITTED)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def reply(self, request, pk=None):
         try:
             user = self.request.user

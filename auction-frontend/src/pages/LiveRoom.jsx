@@ -7,10 +7,7 @@ import Navbar from '../components/Navbar'
 import { FiMessageCircle } from 'react-icons/fi'
 import { notify } from '../services/notify'
 
-const imgSrc = path => {
-  if (!path) return null
-  return path.startsWith('http') ? path : `http://localhost:8000${path}`
-}
+const imgSrc = path => path || null
 
 const STATUS_COLOR = {
   active: { color: 'var(--gold)', bg: 'rgba(240,180,41,0.12)', border: 'rgba(240,180,41,0.4)' },
@@ -91,13 +88,6 @@ export default function LiveRoom() {
     } catch {
       notify.error('Failed to load requests')
     }
-  }
-
-  const imgSrc = path => {
-    if (!path) return null
-    return path.startsWith('http')
-      ? path
-      : `http://localhost:8000${path}`
   }
 
   const loadBidHistory = async () => {
@@ -919,7 +909,6 @@ export default function LiveRoom() {
                   <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
                     Current item
                   </div>
-
                   {imgSrc(currentItem.image) && (
                     <img
                       src={imgSrc(currentItem.image)}

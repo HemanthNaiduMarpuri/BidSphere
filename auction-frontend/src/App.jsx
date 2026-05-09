@@ -23,6 +23,8 @@ import WalletCancelPage from './pages/WalletCancelPage'
 import Transactions from './pages/Transaction'
 import Security from './pages/Security'
 import AdminContact from './pages/AdminContact'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 
 export default function App() {
   return (
@@ -111,6 +113,13 @@ export default function App() {
             <ProtectedRoute><WalletCancelPage /></ProtectedRoute>
           } />
 
+          <Route path="/forgot-password"  element={
+            <ForgotPassword />
+          }/>
+
+        <Route path="/reset-password/:uid/:token" element={
+          <ResetPassword />
+        }/>
 
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>

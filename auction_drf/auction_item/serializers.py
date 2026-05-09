@@ -1,9 +1,7 @@
-from django.utils import timezone
-from datetime import timedelta
-import datetime
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import AuctionRoom, AuctionItem, Bid, ChatMessage, Wishlist, RequestPanel
 from rest_framework import serializers
+from cloudinary.utils import cloudinary_url
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     username_field = 'email'
@@ -33,10 +31,17 @@ class AuctionRoomDetailSerializer(serializers.ModelSerializer):
         fields = ['id' ,'created_by', 'title', 'sector', 'status', 'reserve_price', 'start_time', 'end_time', 'is_private' ,'created_at', 'end_time_iso']
 
 class AuctionItemSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
     class Meta:
         model = AuctionItem
         fields = ['id' ,'auction_room', 'name', 'description', 'image', 'base_price', 'is_sold', 'duration', 'ends_at', 'extension_count']
         read_only_fields = ['is_sold']
+
+    def get_image(self, obj):
+        if obj.image:
+            url, _ = cloudinary_url(obj.image.public_id)
+            return url
+        return None
     
 class BidSerializer(serializers.ModelSerializer):
     auction_item_name = serializers.CharField(source='auction_item.name', read_only=True)

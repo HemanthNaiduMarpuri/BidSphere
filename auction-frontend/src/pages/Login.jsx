@@ -311,6 +311,9 @@ export default function Login() {
             }
           }}
         />
+        <p style={{ textAlign: 'center', marginTop: '1.5rem', color: 'var(--text2)', fontSize: '14px' }}>
+          <Link to="/forgot-password" style={{ color: 'var(--accent)' }}>Forgot Password</Link>
+        </p>
 
         <p style={{ textAlign: 'center', marginTop: '1.5rem', color: 'var(--text2)', fontSize: '14px' }}>
           Don't have an account?{' '}

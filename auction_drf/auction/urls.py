@@ -21,6 +21,8 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from django.conf import settings
 from django.conf.urls.static import static
 from users.views import ContactView
+from dj_rest_auth.views import PasswordResetView, PasswordResetConfirmView
+from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -41,7 +43,13 @@ urlpatterns = [
         'put': 'update',
         'delete' : 'destroy'
     })),
-    path('api/contact/<uuid:contact_uuid>/reply/', ContactView.as_view({'post': 'reply'})),
+    path(
+        'api/auth/password/reset/confirm/<uidb64>/<token>/',
+        auth_views.PasswordResetConfirmView.as_view(),
+        name='password_reset_confirm'   
+    ),
+    path('api/auth/password/reset/', PasswordResetView.as_view(), name='password_reset'),
+    path('api/auth/password/reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

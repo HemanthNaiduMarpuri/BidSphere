@@ -2,9 +2,7 @@ from datetime import time, timedelta
 import uuid6
 from django.db import models
 from users.models import User
-from django.db import transaction
-from django.db.models import Max
-
+from cloudinary.models import CloudinaryField
 
 class AuctionRoom(models.Model):
     class Status(models.TextChoices):
@@ -39,7 +37,7 @@ class AuctionItem(models.Model):
     name = models.CharField(max_length=255, blank=False)
     description = models.TextField()
     order = models.IntegerField(default=0)
-    image = models.ImageField(upload_to='auction_items/', blank=True, null=True)
+    image = CloudinaryField('image')
     base_price = models.DecimalField(max_digits=10, decimal_places=2)
     is_sold = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     duration = models.IntegerField(default=60)

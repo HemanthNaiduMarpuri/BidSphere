@@ -13,6 +13,9 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 import environ
 import os
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,6 +27,13 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY')
 STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY')
+GOOGLE_ID = env('GOOGLE_ID')
+
+cloudinary.config(
+    cloud_name = env('CLOUD_NAME'),
+    api_key = env('API_KEY'),
+    api_secret = env('API_SECRET')
+)
 
 
 # Quick-start development settings - unsuitable for production
@@ -148,8 +158,12 @@ WSGI_APPLICATION = 'auction.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "NAME": env("DB_NAME"),
+        "USER": env("DB_USER"),
+        "PASSWORD": env("DB_PASSWORD"),
+        "HOST": env("DB_HOST"),
+        "PORT": env("DB_PORT")
     }
 }
 
@@ -197,10 +211,6 @@ ACCOUNT_EMAIL_REQUIRED = True
 
 AUTH_USER_MODEL = 'users.User'
 
-REST_AUTH = {
-    'USE_JWT': True,
-}
-
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
 EMAIL_HOST = env('EMAIL_HOST')
@@ -211,3 +221,8 @@ EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
+
+REST_AUTH = {
+    'USE_JWT': True,
+    'PASSWORD_RESET_SERIALIZER': 'users.serializers.CustomPasswordResetSerializer',
+}
