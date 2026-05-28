@@ -40,6 +40,7 @@ export default function LiveRoom() {
   const [updatingItem, setUpdatingItem] = useState(false)
 
   const [itemTimeLeft, setItemTimeLeft] = useState(0)
+  const [itemMaxTime, setItemMaxTime] = useState(0)
   const [roomTimeLeft, setRoomTimeLeft] = useState(null)
 
   const [chatMessages, setChatMessages] = useState([])
@@ -58,6 +59,13 @@ export default function LiveRoom() {
   const [remainingExtensions, setRemainingExtensions] = useState(0)
   const [activeTab, setActiveTab] = useState('chat')
   const [requestPanels, setRequestPanels] = useState([])
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   const WS_URL = `ws://localhost:8000/ws/auction/${id}/`
   const socketRef = useRef(null)
@@ -93,7 +101,6 @@ export default function LiveRoom() {
   const loadBidHistory = async () => {
     try {
       const res = await auctionAPI.bidHistory(id)
-
       setBidHistory(res.data)
     } finally {
       setLoadingBids(false)
@@ -257,6 +264,10 @@ export default function LiveRoom() {
       if (['sold', 'not_sold', 'passed'].includes(data.status)) {
         setCurrentItem(null)
         setItemTimeLeft(0)
+        setItemMaxTime(0)
+        setBidHistory([])
+        setHighestBidder(null)
+        setBidAmount('')
         clearInterval(timerRef.current)
       }
     }
@@ -373,6 +384,12 @@ export default function LiveRoom() {
       if (action === 'pass') await auctionAPI.passItem(id, currentItem.id)
       if (['sold', 'unsold', 'pass'].includes(action)) {
         setCurrentItem(null)
+        setBidHistory([])
+        setHighestBidder(null)
+        setBidAmount('')
+        setItemTimeLeft(0)
+        setItemMaxTime(0)
+        clearInterval(timerRef.current)
       }
       if (action === 'extendTime') {
         try {
@@ -381,7 +398,7 @@ export default function LiveRoom() {
           const res = await auctionAPI.extendTime(id, currentItem.id);
 
           const endsAt = res.data?.ends_at;
-          const countFromDB = res.data?.remaining_extensions;
+          const countFromDB = res.data?.extension_count;
 
           setRemainingExtensions(5 - countFromDB);
 
@@ -507,6 +524,7 @@ export default function LiveRoom() {
   const startTimer = (seconds, itemId) => {
     if (timerRef.current) clearInterval(timerRef.current)
     setItemTimeLeft(seconds)
+    setItemMaxTime(seconds) 
 
     timerRef.current = setInterval(() => {
       setItemTimeLeft(prev => {
@@ -526,6 +544,15 @@ export default function LiveRoom() {
       const res = await auctionAPI.completeItem(id, itemId)
 
       notify.success(res.data.message)
+
+      setCurrentItem(null)
+      setBidHistory([])
+      setHighestBidder(null)
+      setBidAmount('')
+      setItemTimeLeft(0)
+      setItemMaxTime(0)
+      clearInterval(timerRef.current)
+      loadItems()
 
     } catch (err) {
       notify.error(
@@ -768,11 +795,25 @@ export default function LiveRoom() {
     </div>
   )
 
+  const timerProgress = itemMaxTime > 0 ? itemTimeLeft / itemMaxTime : 0
+  const timerBarColor = itemTimeLeft <= 10
+    ? 'var(--danger)'
+    : itemTimeLeft <= 30
+      ? '#f59e0b'
+      : 'var(--gold)'
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <Navbar />
-      <div className="container" style={{ padding: '1.5rem' }}>
-        <div className="fade-in" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+      <div className="container" style={{ padding: isMobile ? '1rem 0.75rem' : '1.5rem' }}>
+        <div className="fade-in" style={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between',
+          alignItems: isMobile ? 'flex-start' : 'center',
+          gap: isMobile ? 10 : 0,
+          marginBottom: '1.5rem'
+        }}>
           <div>
             <button
               onClick={() => navigate(-1)}
@@ -799,15 +840,15 @@ export default function LiveRoom() {
             >
               ← Back
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
 
-              <h1 style={{ fontSize: 24 }}>{auction?.title}</h1>
+              <h1 style={{ fontSize: isMobile ? 18 : 24 }}>{auction?.title}</h1>
               <span className="badge badge-live"><span className="dot-live" /> Live</span>
             </div>
             <p style={{ color: 'var(--text2)', fontSize: 13 }}>{auction?.sector}</p>
 
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {roomTimeLeft !== null && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -900,7 +941,11 @@ export default function LiveRoom() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 340px',
+          gap: '1.5rem'
+        }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
             <div className="card fade-in">
@@ -913,12 +958,12 @@ export default function LiveRoom() {
                     <img
                       src={imgSrc(currentItem.image)}
                       alt={currentItem.name}
-                      style={{ width: '100%', height: 220, objectFit: 'cover', borderRadius: 10, marginBottom: '1rem' }}
+                      style={{ width: '100%', height: isMobile ? 160 : 220, objectFit: 'cover', borderRadius: 10, marginBottom: '1rem' }}
                       onError={e => { e.target.style.display = 'none' }}
                     />
                   )}
 
-                  <h2 style={{ fontSize: 28, marginBottom: 6 }}>{currentItem.name}</h2>
+                  <h2 style={{ fontSize: isMobile ? 20 : 28, marginBottom: 6 }}>{currentItem.name}</h2>
 
                   {currentItem.description && (
                     <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: '1rem' }}>{currentItem.description}</p>
@@ -936,6 +981,27 @@ export default function LiveRoom() {
                       </div>
                     </div>
                   </div>
+
+                  {itemMaxTime > 0 && (
+                    <div style={{
+                      width: '100%',
+                      height: 4,
+                      background: 'rgba(255,255,255,0.08)',
+                      borderRadius: 4,
+                      marginBottom: 10,
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${timerProgress * 100}%`,
+                        background: timerBarColor,
+                        borderRadius: 4,
+                        transition: 'width 1s linear, background 0.5s ease',
+                        boxShadow: `0 0 6px ${timerBarColor}88`
+                      }} />
+                    </div>
+                  )}
+
                   <div style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     padding: '4px 14px',
@@ -978,7 +1044,7 @@ export default function LiveRoom() {
                           top: '50%',
                           left: '50%',
                           transform: 'translate(-50%, -50%)',
-                          width: 340,
+                          width: isMobile ? 'calc(100vw - 32px)' : 340,
                           background: '#0f172a',
                           borderRadius: 14,
                           padding: '20px 18px',
@@ -1034,14 +1100,14 @@ export default function LiveRoom() {
                     </>
                   )}
                   {!isAuctioneer && isLive && itemTimeLeft > 0 && !isTopBidder && (
-                    <form onSubmit={placeBid} style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                    <form onSubmit={placeBid} style={{ display: 'flex', gap: 10, marginBottom: 8, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
                       <input
                         type="number" value={bidAmount}
                         onChange={e => setBidAmount(e.target.value)}
                         placeholder={`Min ₹${parseFloat(currentItem.base_price || 0).toLocaleString()}`}
-                        style={{ flex: 1 }} min={currentItem.base_price} step="1"
+                        style={{ flex: 1, minWidth: isMobile ? '100%' : 'unset' }} min={currentItem.base_price} step="1"
                       />
-                      <button type="submit" className="btn-gold" disabled={placing || !bidAmount}>
+                      <button type="submit" className="btn-gold" disabled={placing || !bidAmount} style={{ width: isMobile ? '100%' : 'auto' }}>
                         {placing ? 'Placing...' : 'Place bid'}
                       </button>
                     </form>
@@ -1096,6 +1162,35 @@ export default function LiveRoom() {
                 </div>
               )}
             </div>
+
+            {isMobile && (
+              <div className="card fade-in">
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: '1rem', color: 'var(--text2)' }}>Bid activity</div>
+                {bidHistory.length === 0 ? (
+                  <p style={{ color: 'var(--text3)', fontSize: 13 }}>No bids yet</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {bidHistory.map((bid, i) => (
+                      <div key={i} style={{
+                        padding: '10px 12px',
+                        background: i === 0 ? 'rgba(240,180,41,0.08)' : 'var(--bg3)',
+                        borderRadius: 'var(--radius-sm)',
+                        border: i === 0 ? '1px solid rgba(240,180,41,0.2)' : '1px solid var(--border)',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                      }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>{bid.bidder}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text3)' }}>{bid.time}</div>
+                        </div>
+                        <div style={{ color: i === 0 ? 'var(--gold)' : 'var(--text)', fontWeight: 600, fontSize: 14 }}>
+                          ₹{parseFloat(bid.amount).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {upcomingItems.length > 0 && (
               <div className="card fade-in">
@@ -1199,7 +1294,7 @@ export default function LiveRoom() {
                                 top: '50%',
                                 left: '50%',
                                 transform: 'translate(-50%, -50%)',
-                                width: 340,
+                                width: isMobile ? 'calc(100vw - 32px)' : 340,
                                 background: '#0f172a',
                                 borderRadius: 14,
                                 padding: '20px 18px',
@@ -1273,7 +1368,7 @@ export default function LiveRoom() {
                                 top: '50%',
                                 left: '50%',
                                 transform: 'translate(-50%, -50%)',
-                                width: 340,
+                                width: isMobile ? 'calc(100vw - 32px)' : 340,
                                 background: '#0f172a',
                                 borderRadius: 14,
                                 padding: '20px 18px',
@@ -1351,7 +1446,7 @@ export default function LiveRoom() {
                                 top: '50%',
                                 left: '50%',
                                 transform: 'translate(-50%, -50%)',
-                                width: 340,
+                                width: isMobile ? 'calc(100vw - 32px)' : 340,
                                 background: '#0f172a',
                                 borderRadius: 14,
                                 padding: '20px 18px',
@@ -1438,32 +1533,34 @@ export default function LiveRoom() {
             )}
           </div>
 
-          <div className="card fade-in" style={{ height: 'fit-content', position: 'sticky', top: 76 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: '1rem', color: 'var(--text2)' }}>Bid activity</div>
-            {bidHistory.length === 0 ? (
-              <p style={{ color: 'var(--text3)', fontSize: 13 }}>No bids yet</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {bidHistory.map((bid, i) => (
-                  <div key={i} style={{
-                    padding: '10px 12px',
-                    background: i === 0 ? 'rgba(240,180,41,0.08)' : 'var(--bg3)',
-                    borderRadius: 'var(--radius-sm)',
-                    border: i === 0 ? '1px solid rgba(240,180,41,0.2)' : '1px solid var(--border)',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                  }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{bid.bidder}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text3)' }}>{bid.time}</div>
+          {!isMobile && (
+            <div className="card fade-in" style={{ height: 'fit-content', position: 'sticky', top: 76 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: '1rem', color: 'var(--text2)' }}>Bid activity</div>
+              {bidHistory.length === 0 ? (
+                <p style={{ color: 'var(--text3)', fontSize: 13 }}>No bids yet</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {bidHistory.map((bid, i) => (
+                    <div key={i} style={{
+                      padding: '10px 12px',
+                      background: i === 0 ? 'rgba(240,180,41,0.08)' : 'var(--bg3)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: i === 0 ? '1px solid rgba(240,180,41,0.2)' : '1px solid var(--border)',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{bid.bidder}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text3)' }}>{bid.time}</div>
+                      </div>
+                      <div style={{ color: i === 0 ? 'var(--gold)' : 'var(--text)', fontWeight: 600, fontSize: 14 }}>
+                        ₹{parseFloat(bid.amount).toLocaleString()}
+                      </div>
                     </div>
-                    <div style={{ color: i === 0 ? 'var(--gold)' : 'var(--text)', fontWeight: 600, fontSize: 14 }}>
-                      ₹{parseFloat(bid.amount).toLocaleString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       {!showChat && (
@@ -1495,7 +1592,7 @@ export default function LiveRoom() {
       <div style={{
         position: 'fixed', top: 0,
         right: showChat ? 0 : '-100%',
-        width: 'clamp(260px, 32%, 380px)',
+        width: isMobile ? '100%' : 'clamp(260px, 32%, 380px)',
         height: '100%',
         background: '#12121f',
         borderLeft: '1px solid rgba(255,255,255,0.08)',
@@ -1625,7 +1722,6 @@ export default function LiveRoom() {
                       {panel.likes + panel.dislikes} votes total
                     </div>
 
-                    {/* vote bar */}
                     {(panel.likes + panel.dislikes) > 0 && (
                       <div style={{
                         height: 4, borderRadius: 4,
@@ -1715,7 +1811,6 @@ export default function LiveRoom() {
           )}
         </div>
 
-        {/* ── input bar — only on chat tab ── */}
         {activeTab === 'chat' && (
           <div style={{
             display: 'flex', gap: 8, padding: '10px 12px',

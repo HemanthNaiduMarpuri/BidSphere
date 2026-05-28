@@ -54,7 +54,7 @@ export default function AuctionAccess() {
       }}>
         <div style={{ width: '100%', maxWidth: 420 }} className="fade-in">
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            
+
             <h2 style={{ fontSize: '24px', marginBottom: '8px' }}>Private Auction</h2>
             {auction && (
               <p style={{ color: 'var(--text2)', fontSize: '14px' }}>
@@ -80,6 +80,9 @@ export default function AuctionAccess() {
                 {verifying ? 'Verifying...' : 'Enter Auction Room'}
               </button>
             </form>
+            <button onClick={() => navigate('/home')} className="btn-danger btn-full btn-lg" style={{ textAlign: 'center', marginTop: '1rem' }}>
+              Back
+            </button>
           </div>
 
           <p style={{ textAlign: 'center', marginTop: '1rem', color: 'var(--text3)', fontSize: '13px' }}>

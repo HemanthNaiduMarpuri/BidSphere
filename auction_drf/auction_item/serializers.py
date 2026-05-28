@@ -31,17 +31,17 @@ class AuctionRoomDetailSerializer(serializers.ModelSerializer):
         fields = ['id' ,'created_by', 'title', 'sector', 'status', 'reserve_price', 'start_time', 'end_time', 'is_private' ,'created_at', 'end_time_iso']
 
 class AuctionItemSerializer(serializers.ModelSerializer):
-    image = serializers.SerializerMethodField()
+    image = serializers.ImageField(required=False, allow_null=True)
     class Meta:
         model = AuctionItem
         fields = ['id' ,'auction_room', 'name', 'description', 'image', 'base_price', 'is_sold', 'duration', 'ends_at', 'extension_count']
-        read_only_fields = ['is_sold']
+        read_only_fields = ['is_sold','extension_count']
 
-    def get_image(self, obj):
-        if obj.image:
-            url, _ = cloudinary_url(obj.image.public_id)
-            return url
-        return None
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if instance.image:
+            ret['image'] = getattr(instance.image, 'url', str(instance.image))
+        return ret
     
 class BidSerializer(serializers.ModelSerializer):
     auction_item_name = serializers.CharField(source='auction_item.name', read_only=True)

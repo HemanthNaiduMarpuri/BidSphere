@@ -42,7 +42,7 @@ class AuctionItem(models.Model):
     is_sold = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     duration = models.IntegerField(default=60)
     ends_at = models.DateTimeField(null=True)
-    extension_count = models.IntegerField(default=0)
+    extension_count = models.IntegerField(default=5)
 
     def save(self, *args, **kwargs):
         if not self.pk:

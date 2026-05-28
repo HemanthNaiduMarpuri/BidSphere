@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { notify } from '../services/notify';
 
 const SuccessPage = () => {
+    const {user} = useAuth()
     const [searchParams] = useSearchParams();
     const [status, setStatus] = useState('loading');
     const sessionId = searchParams.get('session_id');
@@ -84,13 +85,13 @@ const SuccessPage = () => {
                                     Go to Wallet
                                 </button>
 
-                                
+                                {!user.is_auctioner ?
                                 <button
                                     className="btn-gold"
                                     onClick={() => navigate('/user-dashboard')}
                                 >
                                     DashBoard
-                                </button>
+                                </button>: <></>}
 
                             </div>
                         </>

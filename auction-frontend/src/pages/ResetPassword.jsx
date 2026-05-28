@@ -71,8 +71,21 @@ export default function ResetPassword() {
                 onChange={handle}
                 required
               />
-              <button type="button" className="eye-btn" onClick={() => setShow2(!show2)}>
-                {show2 ? '🙈' : '👁'}
+              <button
+                type="button"
+                onClick={() => setShow2(!show2)}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  background: 'none',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  color: '#666'
+                }}
+              >
+                {show2 ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
             {form.new_password2 && (

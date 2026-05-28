@@ -124,7 +124,7 @@ export default function Landing() {
 
           <Step>
             <h2>Final Step</h2>
-            <p>Win The Item</p>
+            <h1>Win The Item</h1>
           </Step>
         </Stepper>
         </section>

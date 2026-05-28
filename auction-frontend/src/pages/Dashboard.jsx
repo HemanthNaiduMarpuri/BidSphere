@@ -67,7 +67,7 @@ export default function Dashboard() {
       <Navbar />
       <div className="container" style={{ padding: '2rem' }}>
         <button
-  onClick={() => navigate(-1)}
+  onClick={() => navigate('/')}
   style={{
     marginBottom: '1.2rem',
     padding: '10px 14px',

@@ -53,7 +53,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 class Otp(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_otp')
-    otp_hashed = models.CharField(max_length=64)
+    otp_hashed = models.CharField(max_length=255)
     attempts = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
