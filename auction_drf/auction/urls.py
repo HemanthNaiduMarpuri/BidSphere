@@ -25,7 +25,8 @@ from dj_rest_auth.views import PasswordResetView, PasswordResetConfirmView
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('bidsphere-django-admin/', admin.site.urls),
+    path('silk/', include('silk.urls')),
     path('api/users/login/', MyTokenObtainPairView.as_view(), name='token'),
     path('api/users/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/users/', include('users.urls')),

@@ -24,6 +24,11 @@ export default function Home() {
   useEffect(() => {
     auctionAPI.list().then(res => {
       setAuctions(res.data)
+      setAuctions(
+        Array.isArray(res.data)
+          ? res.data
+          : []
+      )
       setFiltered(res.data)
     }).finally(() => setLoading(false))
   }, [])

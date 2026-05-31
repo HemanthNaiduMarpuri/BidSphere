@@ -24,6 +24,8 @@ from django.db.models import F
 from django.core.mail import send_mail
 from .permissions import IsOwnerOrReadOnly, IsUser, IsAuctionOwner
 from django.conf import settings
+from .mixins import CacheInvalidateMixin
+from django.core.cache import cache
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
@@ -67,7 +69,7 @@ def broadcast(room_id, payload):
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(f'auction_{room_id}', payload)
 
-class AuctionRoomView(viewsets.ModelViewSet):
+class AuctionRoomView(CacheInvalidateMixin, viewsets.ModelViewSet):
     queryset = AuctionRoom.objects.all()
 
     def get_permissions(self):
@@ -85,12 +87,54 @@ class AuctionRoomView(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        res = AuctionRoom.objects.filter(is_private=True)
+        qs = AuctionRoom.objects.select_related('created_by')
 
         if user.is_auctioner:
             return AuctionRoom.objects.filter(created_by=user)
-        return AuctionRoom.objects.all()
+        return qs
     
+    def list(self, request, *args, **kwargs):
+        user = request.user
+        cache_key = f"auction_rooms_user_{user.id}"
+
+        data = self.get_cached(
+            key=cache_key,
+            queryset_fn=lambda: self.get_queryset(),
+            serializer_class=AuctionRoomDetailSerializer,
+            ttl=60*5,
+            many=True
+        )
+
+        return Response(data)
+    
+    def retrieve(self, request, *args, **kwargs):
+        pk = kwargs.get('pk')
+        cache_key = f"auction_room_{pk}"
+
+        data = self.get_cached(
+            key=cache_key,
+            queryset_fn=lambda: self.get_object(),
+            serializer_class=AuctionRoomDetailSerializer,
+            ttl=60*5,
+            many=False
+        )
+
+        return Response(data)
+    
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        self.invalidate(
+            f"auction_room_{instance.id}",
+            f"auction_rooms_user_{self.request.user.id}"
+        )
+
+    def perform_destroy(self, instance):
+        self.invalidate(
+            f"auction_room_{instance.id}",
+            f"auction_rooms_user_{self.request.user.id}"
+        )
+        instance.delete()
+
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
         auction = self.get_object()
@@ -104,6 +148,10 @@ class AuctionRoomView(viewsets.ModelViewSet):
 
         auction.status = AuctionRoom.Status.LIVE
         auction.save()
+        self.invalidate(
+            f"auction_room_{auction.id}",
+            f"auction_rooms_user_{request.user.id}"
+        )
         broadcast(auction.id, {'type': 'auction_status', 'status': 'Live'})
 
         return Response({'message': 'Auction is Live'}, status=200)
@@ -120,6 +168,10 @@ class AuctionRoomView(viewsets.ModelViewSet):
 
             auction.status = AuctionRoom.Status.CLOSED
             auction.save()
+            self.invalidate(
+                f"auction_room_{auction.id}",
+                f"auction_rooms_user_{request.user.id}"
+            )
             broadcast(auction.id, {'type': 'auction_status', 'status': 'Closed'})
 
             return Response({'message': 'Auction is Closed'}, status=200)
@@ -160,7 +212,7 @@ class AuctionRoomView(viewsets.ModelViewSet):
         return Response({"error": "Incorrect Code"}, status=403)
         
     
-class AuctionItemView(viewsets.ModelViewSet):
+class AuctionItemView(CacheInvalidateMixin ,viewsets.ModelViewSet):
     serializer_class = AuctionItemSerializer
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'pk'  
@@ -180,6 +232,20 @@ class AuctionItemView(viewsets.ModelViewSet):
         auction_id = self.kwargs.get('room_uuid')
         return AuctionItem.objects.filter(auction_room__id=auction_id)
     
+    def list(self, request, *args, **kwargs):
+        room_uuid = self.kwargs.get('room_uuid')
+        cache_key = f"auction_items_{room_uuid}"
+
+        data = self.get_cached(
+            key=cache_key,
+            queryset_fn=lambda: self.get_queryset(),
+            serializer_class=AuctionItemSerializer,
+            ttl=60*5,
+            many=True
+        )
+
+        return Response(data)
+    
     def perform_create(self, serializer):
         auction_id = self.kwargs.get('room_uuid')
         auction = AuctionRoom.objects.get(id=auction_id)
@@ -187,7 +253,17 @@ class AuctionItemView(viewsets.ModelViewSet):
         if auction.created_by != self.request.user:
             raise PermissionDenied('You can only add items to your own auctions')
         
-        serializer.save(auction_room = auction)
+        instance = serializer.save(auction_room = auction)
+        self.invalidate(f"auction_items_{auction.id}")
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        self.invalidate(f"auction_items_{instance.auction.id}")
+
+    def perform_destroy(self, instance):
+        room_id = instance.auction.id
+        instance.delete()
+        self.invalidate(f"auction_items_{room_id}")
 
     @action(detail=True, methods=['post'])
     def sold(self, request, room_uuid=None, item_uuid=None):
@@ -211,13 +287,14 @@ class AuctionItemView(viewsets.ModelViewSet):
                 
                     item.is_sold = AuctionItem.Status.SOLD
                     item.save()
+
                 broadcast(auction.id, {'type': 'item_status', 'status': 'Sold', 'item_id':item.id})
                 send_mail("You Won a Bid in BidSphere", 
                         f'{winning_bid.bidder.first_name}, You won bid for {winning_bid.auction_item.name} in BidSphere auction {auction.title}',
                         'noreply@myapp.com',
                         [winning_bid.bidder.email],)
 
-
+                self.invalidate(f"auction_items_{auction.id}")
                 return Response({'message': f'{item.name} marked as sold'} ,status=200)
             
         except Exception as e:
@@ -434,7 +511,7 @@ class AuctionItemView(viewsets.ModelViewSet):
                 'item_name': auction_item.name,
             }
         )
-
+        self.invalidate(f"auction_items_{auction_room.id}")
         return Response({'message':'Item Activated'}, status=200)
 
     @action(detail=True, methods=['post'])
@@ -531,7 +608,7 @@ class AuctionItemView(viewsets.ModelViewSet):
         if auction_items <= 0:
             return Response([])
         
-        request_items = RequestPanel.objects.filter(auction_room=room_uuid, is_accepted=RequestPanel.REQUEST_CHOICES.PENDING).annotate(score=F('likes') - F('dislikes')).order_by('-score', '-likes')
+        request_items = RequestPanel.objects.select_related('auction_item').filter(auction_room=room_uuid, is_accepted=RequestPanel.REQUEST_CHOICES.PENDING).annotate(score=F('likes') - F('dislikes')).order_by('-score', '-likes')
         items = RequestPanelSerializer(request_items, many=True)
         return Response(items.data)
     
@@ -561,13 +638,10 @@ class AuctionItemView(viewsets.ModelViewSet):
                 return Response({"message": "item may be in active stage or sold out"}, status=400) 
             
             with transaction.atomic():
-                panel = RequestPanel.objects.filter(auction_room=auction_room, auction_item=auction_item).first()
+                panel, created = RequestPanel.objects.get_or_create(auction_room=auction_room, auction_item=auction_item)
 
-                if panel:
+                if not created:
                     return Response({'message': 'Already requested', 'panel_id':panel.id},status=400)
-   
-                new_item = RequestPanel.objects.create(auction_room=auction_room, auction_item=auction_item)
-                new_item.save()
 
                 return Response({'message':'Item Requested and created'}, status=200)
 
@@ -777,10 +851,16 @@ class ChatMessageView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, room_uuid):
-        messages = ChatMessage.objects.filter(auction=room_uuid).order_by('-created_at')[:50]
+        cache_key = f"chat_message_{room_uuid}"
+        cached = cache.get(cache_key)
+        
+        if cached is not None:
+            return Response(cached)
+        messages = ChatMessage.objects.filter(auction__id=room_uuid).select_related('user').order_by('-created_at')[:50]
 
-        serializer = ChatMessageSerializer(messages, many=True)
-        return Response(serializer.data)
+        serializer = ChatMessageSerializer(messages, many=True).data
+        cache.set(cache_key, serializer, 60)
+        return Response(serializer)
     
 class WishListView(viewsets.ModelViewSet):
     serializer_class = WishListSerializer

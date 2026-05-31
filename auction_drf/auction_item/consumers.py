@@ -4,7 +4,7 @@ import json
 from asgiref.sync import sync_to_async
 from users.models import User
 from auction_item.models import AuctionRoom, ChatMessage
-
+from django.core.cache import cache
 
 class AuctionConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -173,6 +173,8 @@ class AuctionConsumer(AsyncWebsocketConsumer):
         username = event['username']
         email = event['email']
         time = event['time']
+        await sync_to_async(cache.delete)(f"auction_items_{self.room_id}")
+        
         await self.send(text_data=json.dumps({
             'type': 'chat_message',
             'message': message,

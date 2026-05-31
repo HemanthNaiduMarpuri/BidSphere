@@ -85,7 +85,11 @@ export default function LiveRoom() {
   const loadItems = async () => {
     try {
       const res = await auctionAPI.items(id)
-      setUpcomingItems(res.data)
+      setUpcomingItems(
+        Array.isArray(res.data)
+          ? res.data
+          : []
+      )
     } catch { }
   }
 
@@ -486,7 +490,7 @@ export default function LiveRoom() {
   const isClosed = auction?.status === 'Closed'
   const isScheduled = auction?.status === 'Scheduled'
   const isDraft = auction?.status === 'Draft'
-  const doneItems = upcomingItems.filter(i => ['sold', 'not_sold', 'passed'].includes(i.is_sold))
+  const doneItems = Array.isArray(upcomingItems) ? upcomingItems.filter(i => ['sold', 'not_sold', 'passed'].includes(i.is_sold)): []
   const visibleItems = showAllItems ? upcomingItems : upcomingItems.slice(0, 6)
   const [timeLeft, setTimeLeft] = useState('')
   const [showRetractWarning, setShowRetractWarning] = useState(false)

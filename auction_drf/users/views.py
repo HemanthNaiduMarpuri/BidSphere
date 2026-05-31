@@ -14,14 +14,21 @@ from django.db import transaction
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from datetime import timedelta
+from datetime import date, timedelta
 from django.conf import settings
 from .permissions import IsOwnerOrReadOnly, IsSuperUser
+from .tasks import send_welcome_email, changed_password
 
 class RegisterView(generics.CreateAPIView):
     query_set = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
+
+    def perform_create(self, serializer):
+        
+        user = serializer.save()
+        transaction.on_commit(lambda: send_welcome_email.delay(user.email))
+    
 
 class ProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
@@ -49,6 +56,7 @@ class ChangePasswordView(APIView):
             new_password = request.data.get('new_password')
 
             user = request.user
+            current = User.objects.filter(email=user)
 
             if not old_password or not new_password:
                 return Response({'error': 'Both fields required'}, status=400)
@@ -61,6 +69,7 @@ class ChangePasswordView(APIView):
             user.set_password(new_password)
             user.save()
 
+            changed_password.delay(user_email=current.email, first_name=current.first_name, last_name=current.lastname, updated_date=date.today())
             return Response({'message': 'Password updated successfully'}, status=200)
         
         except Exception as e:

@@ -17,7 +17,6 @@ API.interceptors.response.use(
       original._retry = true
       try {
         const refresh = localStorage.getItem('refresh')
-        console.log(refresh)
         const { data } = await axios.post('http://localhost:8000/api/users/token/refresh/', { refresh })
         localStorage.setItem('access', data.access)
         original.headers.Authorization = `Bearer ${data.access}`

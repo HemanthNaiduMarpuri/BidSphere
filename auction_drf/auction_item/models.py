@@ -11,15 +11,15 @@ class AuctionRoom(models.Model):
         LIVE = "Live", 'Live'
         CLOSED = 'Closed', 'Closed'
     id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='auction_rooms') 
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='auction_rooms', db_index=True) 
     title = models.CharField(max_length=255, blank=False, null=False)
     sector = models.CharField(max_length=255, blank=False, null=False)
-    status = models.CharField(max_length=50, choices=Status.choices, default=Status.DRAFT)
+    status = models.CharField(max_length=50, choices=Status.choices, default=Status.DRAFT, db_index=True)
     reserve_price = models.DecimalField(max_digits=10, decimal_places=2)
     is_private = models.BooleanField(default=False)
     access_code = models.CharField(max_length=50, null=True, blank=True)
-    start_time = models.DateTimeField()
-    end_time = models.DateTimeField()
+    start_time = models.DateTimeField(db_index=True)
+    end_time = models.DateTimeField(db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -33,16 +33,22 @@ class AuctionItem(models.Model):
         NOT_SOLD = 'Not Sold', 'Not Sold'
         PASS = 'Pass', 'Pass'
     id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
-    auction_room = models.ForeignKey(AuctionRoom, on_delete=models.SET_NULL, null=True, related_name='items')
+    auction_room = models.ForeignKey(AuctionRoom, on_delete=models.SET_NULL, null=True, related_name='items', db_index=True)
     name = models.CharField(max_length=255, blank=False)
     description = models.TextField()
     order = models.IntegerField(default=0)
     image = CloudinaryField('image')
     base_price = models.DecimalField(max_digits=10, decimal_places=2)
-    is_sold = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
-    duration = models.IntegerField(default=60)
-    ends_at = models.DateTimeField(null=True)
+    is_sold = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    duration = models.IntegerField(default=60, db_index=True)
+    ends_at = models.DateTimeField(null=True, db_index=True)
     extension_count = models.IntegerField(default=5)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['auction_room', 'is_sold']),
+            models.Index(fields=['auction_room', 'order']),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.pk:
@@ -65,36 +71,46 @@ class Bid(models.Model):
         PAID = 'paid', 'paid'
         CANCELLED = 'cancelled', 'cancelled'
     id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
-    auction_room = models.ForeignKey(AuctionRoom, on_delete=models.SET_NULL, null=True ,related_name='bids')
-    auction_item = models.ForeignKey(AuctionItem, on_delete=models.SET_NULL, null=True ,related_name='bids')
-    bidder = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='bids')
+    auction_room = models.ForeignKey(AuctionRoom, on_delete=models.SET_NULL, null=True ,related_name='bids', db_index=True)
+    auction_item = models.ForeignKey(AuctionItem, on_delete=models.SET_NULL, null=True ,related_name='bids', db_index=True)
+    bidder = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='bids', db_index=True)
     bid_amount = models.DecimalField(max_digits=10 ,decimal_places=2)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OUTBID)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OUTBID, db_index=True)
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS.choices, default=PAYMENT_STATUS.PENDING)
-    is_winning = models.BooleanField(default=False)
+    is_winning = models.BooleanField(default=False, db_index=True)
     placed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-bid_amount']
+        indexes = [
+            models.Index(fields=['auction_item', 'is_winning']),
+            models.Index(fields=['auction_item', '-bid_amount']),
+            models.Index(fields=['bidder', 'status']),
+        ]
 
     def __str__(self):
         return f"{self.bidder} -> {self.bid_amount}"
     
 class ChatMessage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
-    auction = models.ForeignKey(AuctionRoom, on_delete=models.CASCADE, related_name='messages')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    auction = models.ForeignKey(AuctionRoom, on_delete=models.CASCADE, related_name='messages', db_index=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, db_index=True)
     message = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['auction', '-created_at'])
+        ]
 
     def __str__(self):
         return f"{self.user.first_name} - {self.message[:20]}"
 
 class Wishlist(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
-    auction_room = models.ForeignKey(AuctionRoom, on_delete=models.SET_NULL, null=True,related_name='auction_wishlist')
-    auction_item = models.ForeignKey(AuctionItem, on_delete=models.SET_NULL, null=True,related_name='item_wishlist')
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_wishlist')
+    auction_room = models.ForeignKey(AuctionRoom, on_delete=models.SET_NULL, null=True,related_name='auction_wishlist', db_index=True)
+    auction_item = models.ForeignKey(AuctionItem, on_delete=models.SET_NULL, null=True,related_name='item_wishlist', db_index=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_wishlist', db_index=True)
     is_wishlist = models.BooleanField(default=False)
 
     class Meta:
@@ -111,11 +127,11 @@ class RequestPanel(models.Model):
         REJECTED = 'Rejected', 'Rejected'
 
     id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
-    auction_room = models.ForeignKey(AuctionRoom, on_delete=models.CASCADE, related_name='request_panel_room')
-    auction_item = models.ForeignKey(AuctionItem, on_delete=models.CASCADE, related_name='request_item')
-    likes = models.PositiveIntegerField(default=0)
-    dislikes = models.PositiveIntegerField(default=0)
-    is_accepted = models.CharField(max_length=15, choices=REQUEST_CHOICES.choices, default=REQUEST_CHOICES.PENDING)
+    auction_room = models.ForeignKey(AuctionRoom, on_delete=models.CASCADE, related_name='request_panel_room', db_index=True)
+    auction_item = models.ForeignKey(AuctionItem, on_delete=models.CASCADE, related_name='request_item', db_index=True)
+    likes = models.PositiveIntegerField(default=0, db_index=True)
+    dislikes = models.PositiveIntegerField(default=0, db_index=True)
+    is_accepted = models.CharField(max_length=15, choices=REQUEST_CHOICES.choices, default=REQUEST_CHOICES.PENDING, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -131,12 +147,13 @@ class VoteItem(models.Model):
         DISLIKE = 'DISLIKE', 'DISLIKE'
 
     id = models.UUIDField(primary_key=True, default=uuid6.uuid7, editable=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    request_panel = models.ForeignKey(RequestPanel, on_delete=models.CASCADE, related_name='votes')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, db_index=True)
+    request_panel = models.ForeignKey(RequestPanel, on_delete=models.CASCADE, related_name='votes', db_index=True)
     vote =  models.CharField(max_length=10, choices=VOTE.choices)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = [['user', 'request_panel']]
+        unique_together = ['user', 'request_panel']
+        
     
 
